@@ -1,22 +1,36 @@
-# fly.toml - Fly.io configuration
-# Run `fly launch` to generate app name and deploy
+# Fly.io deployment configuration
+#
+# First-time setup:
+#   1. Run `fly launch` to create your app and update this file
+#   2. Run `fly postgres create --name myapp-db` to create a database
+#   3. Run `fly postgres attach myapp-db` to connect the database
+#   4. Run `fly deploy` to deploy
+#
+# Subsequent deploys:
+#   fly deploy
+#
+# The app name below will be replaced by `fly launch`
 
 app = "REPLACE_WITH_YOUR_APP_NAME"
 primary_region = "sjc"
 
+# Build using the Dockerfile
 [build]
 
+# Environment variables (DATABASE_URL is set automatically by fly postgres attach)
 [env]
   PORT = "3000"
 
+# HTTP service configuration
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = "stop"
-  auto_start_machines = true
-  min_machines_running = 0
+  auto_stop_machines = "stop"    # Stop machine when idle (saves money)
+  auto_start_machines = true     # Start machine on incoming request
+  min_machines_running = 0       # Allow all machines to stop when idle
   processes = ["app"]
 
+# VM resources (minimal for starter app)
 [[vm]]
   memory = "256mb"
   cpu_kind = "shared"

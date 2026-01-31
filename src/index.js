@@ -1,3 +1,17 @@
+/**
+ * Main Express server
+ *
+ * This is the entry point for the application. It sets up:
+ * - Express.js web server
+ * - PostgreSQL database connection pool
+ * - Health check endpoints
+ * - Status page at /
+ *
+ * Environment variables:
+ * - PORT: Server port (default: 3000)
+ * - DATABASE_URL: PostgreSQL connection string
+ */
+
 const express = require('express');
 const { Pool } = require('pg');
 
@@ -5,6 +19,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // PostgreSQL connection pool
+// Uses DATABASE_URL environment variable for connection string
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -12,12 +27,20 @@ const pool = new Pool({
 // Middleware
 app.use(express.json());
 
-// Health check endpoint
+/**
+ * GET /health
+ * Basic health check - returns OK if server is running
+ * Does not check database connection
+ */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Database health check endpoint
+/**
+ * GET /health/db
+ * Database health check - verifies PostgreSQL connection
+ * Returns database time and version if connected
+ */
 app.get('/health/db', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW() as time, version() as version');
@@ -40,11 +63,16 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
-// Homepage - tests server and database connection
+/**
+ * GET /
+ * Status page - displays server and database health in HTML
+ * Shows green indicators for working services, red for failures
+ */
 app.get('/', async (req, res) => {
   const appName = process.env.npm_package_name || 'myapp';
   const serverTime = new Date().toISOString();
 
+  // Check database connection
   let dbStatus = { connected: false, time: null, version: null, error: null };
   try {
     const result = await pool.query('SELECT NOW() as time, version() as version');
@@ -58,6 +86,7 @@ app.get('/', async (req, res) => {
     dbStatus.error = error.message;
   }
 
+  // Render status page HTML
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -142,7 +171,7 @@ app.get('/', async (req, res) => {
   res.send(html);
 });
 
-// Start server
+// Start server on all interfaces (0.0.0.0) for Docker compatibility
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
 });

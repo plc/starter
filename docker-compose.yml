@@ -1,24 +1,43 @@
+# Docker Compose configuration for local development
+#
+# Usage:
+#   docker compose up --build     # Start the app
+#   docker compose down           # Stop the app
+#   docker compose logs -f app    # View app logs
+#
+# The init-db service creates the database if it doesn't exist,
+# then the app service starts and connects to it.
+
 services:
+  # Database initialization - runs once then exits
+  # Creates the database if it doesn't already exist
   init-db:
     image: postgres:16-alpine
     environment:
+      # Connection string to your local PostgreSQL
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@host.docker.internal:5432/myapp}
+      # Name of the database to create
       - DB_NAME=${DB_NAME:-myapp}
     volumes:
       - ./scripts/init-db.sh:/init-db.sh:ro
     entrypoint: ["/init-db.sh"]
+    # Allows container to connect to host machine's PostgreSQL
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Main application
   app:
     build: .
     ports:
       - "3000:3000"
     environment:
+      # PostgreSQL connection string
+      # Uses host.docker.internal to connect from container to host
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@host.docker.internal:5432/myapp}
       - PORT=${PORT:-3000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Wait for database to be created before starting
     depends_on:
       init-db:
         condition: service_completed_successfully
