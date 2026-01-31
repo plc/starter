@@ -15,27 +15,25 @@ After cloning this repo, rename `myapp` to your project name in the following fi
 | File | What to change |
 |------|----------------|
 | `package.json` | `"name": "myapp"` |
-| `docker-compose.yml` | Database name in `DATABASE_URL` and `POSTGRES_DB` |
-| `.env.example` | Database name in `DATABASE_URL` |
+| `.env` | Database name in `DATABASE_URL` |
 | `fly.toml` | `app = "REPLACE_WITH_YOUR_APP_NAME"` |
 
 Or run this command to replace all instances at once:
 
 ```bash
 # Replace 'myapp' with your project name (e.g., 'my-cool-project')
-sed -i '' 's/myapp/my-cool-project/g' package.json docker-compose.yml .env.example
+sed -i '' 's/myapp/my-cool-project/g' package.json .env .env.example
 ```
 
-## Quick Start (Docker)
+## Quick Start
 
 ```bash
-# Start the app and database
 docker compose up --build
-
-# Verify it works
-curl http://localhost:3000/health
-curl http://localhost:3000/health/db
 ```
+
+Open http://localhost:3000 to verify everything works.
+
+The database is created automatically. To customize settings, create a `.env` file (see `.env.example`).
 
 ## Local Development (without Docker)
 
@@ -43,11 +41,11 @@ curl http://localhost:3000/health/db
 # Install dependencies
 npm install
 
-# Copy environment file
+# Copy environment file and edit if needed
 cp .env.example .env
 
-# Start PostgreSQL (via Docker or locally)
-docker compose up db -d
+# For local dev, use localhost instead of host.docker.internal
+# DATABASE_URL=postgres://postgres:postgres@localhost:5432/myapp
 
 # Run the app
 npm run dev
@@ -140,6 +138,8 @@ fly deploy
 ├── src/
 │   ├── index.js        # Express server with routes
 │   └── healthcheck.js  # Health check script
+├── scripts/
+│   └── init-db.sh      # Database initialization script
 ├── Dockerfile          # Production container
 ├── docker-compose.yml  # Local development setup
 ├── fly.toml            # Fly.io configuration
