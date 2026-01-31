@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides instructions for AI assistants (like Claude) working with this codebase.
+This file provides instructions for Claude Code when working with this codebase.
 
 ## Project Overview
 
@@ -10,31 +10,53 @@ This is a Node.js starter template with:
 - Docker for local development
 - Fly.io for production deployment
 
-## Common Tasks
+## Initializing a New Project
 
-### Initialize the Project
+When a user clones this repo to start a new project, you MUST:
 
-When a user asks to "init" or "set up" this project:
-
-1. **Rename the project** (if they provide a name):
+1. **Rename `myapp` to the project name**:
    ```bash
-   # Replace 'myapp' with the new project name in these files:
-   # - package.json (name field)
-   # - docker-compose.yml (DB_NAME and DATABASE_URL)
-   # - .env.example (DB_NAME and DATABASE_URL)
-   sed -i '' 's/myapp/NEW_PROJECT_NAME/g' package.json docker-compose.yml .env.example
+   sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example
    ```
 
-2. **Start the local server**:
+2. **Rewrite this CLAUDE.md file** - Replace it entirely with project-specific content:
+   - Remove ALL "starter template" references
+   - Write a clear "Project Overview" section describing what THIS project does
+   - Keep the "Common Tasks" section (start server, deploy, test commands)
+   - Keep the "Project Structure" section but update if files change
+   - Keep the "Key Files to Modify" section
+   - Add a "Change Log" section to track significant changes
+   - The goal: future Claude sessions should understand this specific project, not think it's a starter template
+
+3. **Rewrite README.md** - Replace it entirely:
+   - Change title from "Starter" to the project name
+   - Write a clear description of what THIS project does (not "a starter template")
+   - Remove the "Customizing for Your Project" section (no longer relevant)
+   - Keep: Prerequisites, Quick Start, API Endpoints, Local Development, Deploy to Fly.io, Troubleshooting
+   - Update any placeholder text (like `my-project-name`) to the actual project name
+
+4. **Create CHANGELOG.md**:
+   ```markdown
+   # Changelog
+
+   ## [Unreleased]
+
+   ### Added
+   - Initial project setup from starter template
+   - Express.js server with health check endpoints
+   - PostgreSQL database connection
+   - Docker development environment
+   - Fly.io deployment configuration
+   ```
+
+5. **Start the server**:
    ```bash
    docker compose up --build
    ```
 
-3. **Verify it works**:
-   ```bash
-   curl http://127.0.0.1:3000/health
-   curl http://127.0.0.1:3000/health/db
-   ```
+6. **Verify at http://127.0.0.1:3000**
+
+## Common Tasks
 
 ### Start Local Development Server
 
@@ -46,10 +68,10 @@ The server runs at http://127.0.0.1:3000
 
 ### Deploy to Fly.io
 
-For first-time deployment:
+IMPORTANT: You must create the app on Fly BEFORE running `fly deploy`:
 
 ```bash
-# 1. Launch the app (creates fly.toml config)
+# 1. Create the app (updates fly.toml with real app name)
 fly launch
 # - Choose app name and region
 # - Say NO to Postgres (we create it separately)
@@ -118,9 +140,30 @@ When adding features, these are the main files:
 
 The `scripts/init-db.sh` script automatically creates the database if it doesn't exist when running locally with Docker.
 
+## Ongoing Project Maintenance
+
+When making changes to projects created from this starter:
+
+1. **Update CHANGELOG.md** with every significant change:
+   - New features go under `### Added`
+   - Bug fixes go under `### Fixed`
+   - Changes to existing features go under `### Changed`
+   - Removed features go under `### Removed`
+
+2. **Update CLAUDE.md** when:
+   - Adding new endpoints or features (document them in Project Overview)
+   - Changing project structure (update the tree)
+   - Adding new environment variables (add to the table)
+   - Adding new common tasks or commands
+
+3. **Update README.md** when:
+   - Adding new API endpoints
+   - Changing setup/deployment steps
+   - Adding new prerequisites or dependencies
+
 ## Important Notes
 
-1. **Don't modify fly.toml app name** - It gets set by `fly launch`
+1. **Don't modify fly.toml app name manually** - It gets set by `fly launch`
 2. **DATABASE_URL format**: `postgres://user:password@host:port/database`
 3. **Local dev uses host.docker.internal** to connect from Docker to host PostgreSQL
 4. **The init-db service only runs locally** - Fly.io doesn't need it because `fly postgres attach` creates the database
