@@ -1,0 +1,23 @@
+# fly.toml - Fly.io configuration
+# Run `fly launch` to generate app name and deploy
+
+app = "REPLACE_WITH_YOUR_APP_NAME"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
