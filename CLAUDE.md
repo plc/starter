@@ -35,6 +35,7 @@ When a user clones this repo to start a new project, you MUST:
      - README.md - Setup and usage
      - CLAUDE.md - AI assistant instructions and project context
      - CHANGELOG.md - Project history and learnings
+     - GOTCHAS.md - Known issues and post-mortems
    - Remove the "Customizing for Your Project" section (no longer relevant)
    - Keep: Prerequisites, Quick Start, API Endpoints, Local Development, Deploy to Fly.io, Troubleshooting
    - Update any placeholder text (like `my-project-name`) to the actual project name
@@ -58,12 +59,23 @@ When a user clones this repo to start a new project, you MUST:
    - (Record any important learnings, challenges encountered, or decisions made during development)
    ```
 
-5. **Start the server**:
+5. **Create GOTCHAS.md** for tracking issues and post-mortems:
+   ```markdown
+   # Gotchas
+
+   This file documents confusing issues, mistakes, and lessons learned during development.
+
+   ## Post-Mortems
+
+   (Add entries when you encounter problems, get stuck, or have to undo work)
+   ```
+
+6. **Start the server**:
    ```bash
    docker compose up --build
    ```
 
-6. **Verify at http://127.0.0.1:3000**
+7. **Verify at http://127.0.0.1:3000**
 
 ## Common Tasks
 
@@ -151,9 +163,11 @@ The `scripts/init-db.sh` script automatically creates the database if it doesn't
 
 ## Ongoing Project Maintenance
 
+**IMPORTANT: Keep documentation updated as you work, not after.**
+
 When making changes to projects created from this starter:
 
-1. **Update CHANGELOG.md** with every significant change:
+1. **Update CHANGELOG.md** - Do this IMMEDIATELY after completing each change:
    - `### Added` - new features
    - `### Changed` - changes to existing features
    - `### Fixed` - bug fixes
@@ -172,6 +186,14 @@ When making changes to projects created from this starter:
    - Adding new API endpoints
    - Changing setup/deployment steps
    - Adding new prerequisites or dependencies
+
+4. **Update GOTCHAS.md** when:
+   - You get stuck in a loop or have to undo work
+   - Something doesn't work as expected
+   - You discover confusing behavior or edge cases
+   - Write a brief post-mortem: what happened, why, and how to avoid it
+
+5. **Git commits**: Commit changes locally but DO NOT push to origin without explicit user permission. After committing, remind the user to push if they want to update the remote repository.
 
 ## Important Notes
 

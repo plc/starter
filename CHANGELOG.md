@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Docker development environment with auto-database creation
 - Fly.io deployment configuration
 - CLAUDE.md with comprehensive instructions for AI assistants
+- CHANGELOG.md for tracking project history
+- GOTCHAS.md for documenting issues and post-mortems
 - Documentation links in README.md
 
 ### Notes
