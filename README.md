@@ -2,6 +2,12 @@
 
 A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deployment.
 
+## Documentation
+
+- **[README.md](README.md)** - This file. Setup, usage, and deployment instructions.
+- **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code AI assistant. Project context, common tasks, and maintenance guidelines.
+- **[CHANGELOG.md](CHANGELOG.md)** - Project history, changes, and learnings.
+
 ## What's Included
 
 - **Express.js** server with health check endpoints

@@ -31,13 +31,19 @@ When a user clones this repo to start a new project, you MUST:
 3. **Rewrite README.md** - Replace it entirely:
    - Change title from "Starter" to the project name
    - Write a clear description of what THIS project does (not "a starter template")
+   - Include a "Documentation" section with links to:
+     - README.md - Setup and usage
+     - CLAUDE.md - AI assistant instructions and project context
+     - CHANGELOG.md - Project history and learnings
    - Remove the "Customizing for Your Project" section (no longer relevant)
    - Keep: Prerequisites, Quick Start, API Endpoints, Local Development, Deploy to Fly.io, Troubleshooting
    - Update any placeholder text (like `my-project-name`) to the actual project name
 
-4. **Create CHANGELOG.md**:
+4. **Create CHANGELOG.md** to track changes, learnings, and challenges:
    ```markdown
    # Changelog
+
+   All notable changes to this project will be documented in this file.
 
    ## [Unreleased]
 
@@ -47,6 +53,9 @@ When a user clones this repo to start a new project, you MUST:
    - PostgreSQL database connection
    - Docker development environment
    - Fly.io deployment configuration
+
+   ### Notes
+   - (Record any important learnings, challenges encountered, or decisions made during development)
    ```
 
 5. **Start the server**:
@@ -145,16 +154,19 @@ The `scripts/init-db.sh` script automatically creates the database if it doesn't
 When making changes to projects created from this starter:
 
 1. **Update CHANGELOG.md** with every significant change:
-   - New features go under `### Added`
-   - Bug fixes go under `### Fixed`
-   - Changes to existing features go under `### Changed`
-   - Removed features go under `### Removed`
+   - `### Added` - new features
+   - `### Changed` - changes to existing features
+   - `### Fixed` - bug fixes
+   - `### Removed` - removed features
+   - `### Notes` - important learnings, challenges encountered, or architectural decisions
+   - Include dates for releases (use `## [1.0.0] - 2024-01-15` format)
 
 2. **Update CLAUDE.md** when:
    - Adding new endpoints or features (document them in Project Overview)
    - Changing project structure (update the tree)
    - Adding new environment variables (add to the table)
    - Adding new common tasks or commands
+   - Encountering important gotchas or learnings (add to Important Notes)
 
 3. **Update README.md** when:
    - Adding new API endpoints
