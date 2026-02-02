@@ -5,7 +5,8 @@ A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deploymen
 ## Documentation
 
 - **[README.md](README.md)** - This file. Setup, usage, and deployment instructions.
-- **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code AI assistant. Project context, common tasks, and maintenance guidelines.
+- **[SPEC.md](SPEC.md)** - Project-specific details: endpoints, structure, environment variables.
+- **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code AI assistant. Workflow and maintenance guidelines.
 - **[CHANGELOG.md](CHANGELOG.md)** - Project history, changes, and learnings.
 - **[GOTCHAS.md](GOTCHAS.md)** - Known issues, confusing behaviors, and post-mortems.
 
@@ -43,7 +44,8 @@ That's it! The database is created automatically.
 │   ├── index.js          # Express server with routes and status page
 │   └── healthcheck.js    # Health check script for testing
 ├── scripts/
-│   └── init-db.sh        # Creates database if it doesn't exist
+│   ├── init-db.sh        # Creates database if it doesn't exist
+│   └── get-port.sh       # Generates deterministic port from project name
 ├── Dockerfile            # Production container image
 ├── docker-compose.yml    # Local development setup
 ├── fly.toml              # Fly.io deployment configuration
@@ -59,26 +61,38 @@ That's it! The database is created automatically.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3000` | Server port |
+| `PORT` | `3000` | Server port (use `./scripts/get-port.sh` for deterministic port) |
 | `DATABASE_URL` | `postgres://postgres:postgres@host.docker.internal:5432/myapp` | PostgreSQL connection string |
 | `DB_NAME` | `myapp` | Database name (used by init script) |
 
 ### Customizing for Your Project
 
-Replace `myapp` with your project name:
+Replace `myapp` with your project name and set a deterministic port:
 
 ```bash
 # On macOS
 sed -i '' 's/myapp/my-project-name/g' package.json docker-compose.yml .env.example
 
+# Generate a deterministic port (avoids conflicts when running multiple projects)
+PORT=$(./scripts/get-port.sh my-project-name)
+sed -i '' "s/PORT=3000/PORT=$PORT/" .env.example
+
+# Create your .env file
+cp .env.example .env
+```
+
+```bash
 # On Linux
 sed -i 's/myapp/my-project-name/g' package.json docker-compose.yml .env.example
+PORT=$(./scripts/get-port.sh my-project-name)
+sed -i "s/PORT=3000/PORT=$PORT/" .env.example
+cp .env.example .env
 ```
 
 Or manually update these files:
 - `package.json` - change `"name": "myapp"`
 - `docker-compose.yml` - change `DB_NAME` and database name in `DATABASE_URL`
-- `.env.example` - change database name in `DATABASE_URL` and `DB_NAME`
+- `.env.example` - change database name in `DATABASE_URL`, `DB_NAME`, and `PORT`
 
 ## API Endpoints
 

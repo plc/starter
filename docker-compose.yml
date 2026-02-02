@@ -1,43 +1,41 @@
 # Docker Compose configuration for local development
 #
+# Architecture:
+#   host postgres (5432) <- init-db (migrations) <- app (node.js)
+#
 # Usage:
-#   docker compose up --build     # Start the app
-#   docker compose down           # Stop the app
+#   docker compose up --build     # Start everything
+#   docker compose down           # Stop everything
 #   docker compose logs -f app    # View app logs
 #
-# The init-db service creates the database if it doesn't exist,
-# then the app service starts and connects to it.
+# Prerequisites:
+#   PostgreSQL running on host machine (port 5432)
+#
+# Port: Determined by project name. Run ./scripts/get-port.sh to see your port.
 
 services:
-  # Database initialization - runs once then exits
-  # Creates the database if it doesn't already exist
+  # Database initialization - runs migrations then exits
   init-db:
     image: postgres:16-alpine
     environment:
-      # Connection string to your local PostgreSQL
-      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@host.docker.internal:5432/myapp}
-      # Name of the database to create
+      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
       - DB_NAME=${DB_NAME:-myapp}
     volumes:
       - ./scripts/init-db.sh:/init-db.sh:ro
     entrypoint: ["/init-db.sh"]
-    # Allows container to connect to host machine's PostgreSQL
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # Main application
+  # Node.js application
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     environment:
-      # PostgreSQL connection string
-      # Uses host.docker.internal to connect from container to host
-      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@host.docker.internal:5432/myapp}
+      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
       - PORT=${PORT:-3000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Wait for database to be created before starting
     depends_on:
       init-db:
         condition: service_completed_successfully

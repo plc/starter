@@ -1,14 +1,8 @@
 # CLAUDE.md
 
-This file provides instructions for Claude Code when working with this codebase.
+Instructions for Claude Code when working with this codebase. This file contains generic workflow guidance that can be synced across projects.
 
-## Project Overview
-
-This is a Node.js starter template with:
-- Express.js web server
-- PostgreSQL database
-- Docker for local development
-- Fly.io for production deployment
+For project-specific details, see [SPEC.md](SPEC.md).
 
 ## Initializing a New Project
 
@@ -19,75 +13,87 @@ When a user clones this repo to start a new project, you MUST:
    sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example
    ```
 
-2. **Rewrite this CLAUDE.md file** - Replace it entirely with project-specific content:
-   - Remove ALL "starter template" references
-   - Write a clear "Project Overview" section describing what THIS project does
-   - Keep the "Common Tasks" section (start server, deploy, test commands)
-   - Keep the "Project Structure" section but update if files change
-   - Keep the "Key Files to Modify" section
-   - Add a "Change Log" section to track significant changes
-   - The goal: future Claude sessions should understand this specific project, not think it's a starter template
+2. **Set a deterministic port** (avoids conflicts when running multiple projects):
+   ```bash
+   PORT=$(./scripts/get-port.sh PROJECT_NAME)
+   sed -i '' "s/PORT=3000/PORT=$PORT/" .env.example
+   cp .env.example .env
+   ```
 
-3. **Rewrite README.md** - Replace it entirely:
+3. **Rewrite SPEC.md** with project-specific content:
+   - Update the project name and description
+   - Keep the structure (Common Tasks, Project Structure, Environment Variables, etc.)
+   - The goal: future Claude sessions should understand this specific project
+
+4. **Rewrite README.md**:
    - Change title from "Starter" to the project name
-   - Write a clear description of what THIS project does (not "a starter template")
-   - Include a "Documentation" section with links to:
-     - README.md - Setup and usage
-     - CLAUDE.md - AI assistant instructions and project context
-     - CHANGELOG.md - Project history and learnings
-     - GOTCHAS.md - Known issues and post-mortems
-   - Remove the "Customizing for Your Project" section (no longer relevant)
-   - Keep: Prerequisites, Quick Start, API Endpoints, Local Development, Deploy to Fly.io, Troubleshooting
-   - Update any placeholder text (like `my-project-name`) to the actual project name
+   - Write a clear description of what THIS project does
+   - Keep the Documentation links section
+   - Remove "Customizing for Your Project" section
 
-4. **Create CHANGELOG.md** to track changes, learnings, and challenges:
-   ```markdown
-   # Changelog
+5. **Update CHANGELOG.md** with initial project setup
 
-   All notable changes to this project will be documented in this file.
+6. **Clear GOTCHAS.md** example content (keep the template structure)
 
-   ## [Unreleased]
-
-   ### Added
-   - Initial project setup from starter template
-   - Express.js server with health check endpoints
-   - PostgreSQL database connection
-   - Docker development environment
-   - Fly.io deployment configuration
-
-   ### Notes
-   - (Record any important learnings, challenges encountered, or decisions made during development)
-   ```
-
-5. **Create GOTCHAS.md** for tracking issues and post-mortems:
-   ```markdown
-   # Gotchas
-
-   This file documents confusing issues, mistakes, and lessons learned during development.
-
-   ## Post-Mortems
-
-   (Add entries when you encounter problems, get stuck, or have to undo work)
-   ```
-
-6. **Start the server**:
+7. **Start the server**:
    ```bash
    docker compose up --build
    ```
 
-7. **Verify at http://127.0.0.1:3000**
+8. **Verify at http://127.0.0.1:$PORT** (use the port from step 2)
 
-## Common Tasks
+## Documentation Maintenance
 
-### Start Local Development Server
+**IMPORTANT: Keep documentation updated as you work, not after.**
 
-```bash
-docker compose up --build
+### Files to Update
+
+| File | When to Update | What to Update |
+|------|----------------|----------------|
+| **CHANGELOG.md** | After EVERY significant change | New features, fixes, changes, learnings |
+| **SPEC.md** | When project details change | Endpoints, structure, env vars, commands |
+| **README.md** | When user-facing details change | Setup steps, API docs, prerequisites |
+| **GOTCHAS.md** | When you encounter problems | Post-mortems, confusing behaviors, fixes |
+
+### CHANGELOG.md Format
+
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Changed
+- What changed and why
+
+### Fixed
+- Bug that was fixed
+
+### Removed
+- What was removed
+
+### Notes
+- Important learnings or decisions
 ```
 
-The server runs at http://127.0.0.1:3000
+Include dates for releases: `## [1.0.0] - 2024-01-15`
 
-### Deploy to Fly.io
+### GOTCHAS.md Format
+
+When you encounter a problem, add:
+- **Date**: When it happened
+- **Problem**: What went wrong
+- **Cause**: Why it happened
+- **Solution**: How it was fixed
+- **Prevention**: How to avoid it in the future
+
+## Git Workflow
+
+- **Commit** changes locally after completing work
+- **DO NOT push** to origin without explicit user permission
+- After committing, remind the user to push if they want to update the remote
+
+## Deploying to Fly.io
 
 IMPORTANT: You must create the app on Fly BEFORE running `fly deploy`:
 
@@ -111,93 +117,56 @@ fly deploy
 fly open
 ```
 
-For subsequent deploys:
-```bash
-fly deploy
-```
+For subsequent deploys: `fly deploy`
 
-### Run Tests
+## Docker Best Practices
 
-```bash
-# With server running
-npm test
-
-# Or use curl
-curl http://127.0.0.1:3000/health
-```
-
-## Project Structure
+### Architecture
 
 ```
-src/index.js        - Main Express server with routes
-src/healthcheck.js  - Health check script
-scripts/init-db.sh  - Database initialization (Docker only)
-Dockerfile          - Production container
-docker-compose.yml  - Local development
-fly.toml            - Fly.io configuration
+docker compose up
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│       init-db (one-shot) ──────→ app (node.js)         │
+│          migrations               port $PORT            │
+│              │                        │                 │
+└──────────────│────────────────────────│─────────────────┘
+               │                        │
+               ▼                        ▼
+      host.docker.internal:5432   localhost:$PORT
+         (host PostgreSQL)         (for browser)
 ```
 
-## Key Files to Modify
+### Key Principles
 
-When adding features, these are the main files:
+1. **PostgreSQL runs on HOST machine** - shared across all projects
+   - Use `host.docker.internal:5432` for container-to-host connections
+   - Each project uses a different database NAME (not a different PostgreSQL instance)
 
-- **src/index.js** - Add new routes and endpoints here
-- **package.json** - Add new dependencies here
-- **docker-compose.yml** - Add new services or environment variables
-- **fly.toml** - Modify deployment settings
+2. **Service dependencies**:
+   - `init-db` creates the database if it doesn't exist, runs migrations, then exits
+   - `app` waits for `init-db` to complete successfully
 
-## Environment Variables
+3. **One PostgreSQL, many databases**:
+   - Host runs single PostgreSQL instance on port 5432
+   - Each project creates its own database (e.g., `myapp`, `project2`, etc.)
+   - No port conflicts, no wasted resources
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (default: 3000) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DB_NAME` | Database name for init script |
+4. **`host.docker.internal`**:
+   - Special DNS name that resolves to the host machine from inside Docker
+   - Requires `extra_hosts: ["host.docker.internal:host-gateway"]` in docker-compose
 
-## Database
+### Common Issues
 
-- Local: Uses PostgreSQL running on the host machine (accessed via `host.docker.internal`)
-- Production: Uses Fly Postgres (DATABASE_URL set automatically by `fly postgres attach`)
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| "Connection refused" | PostgreSQL not running on host | Start host PostgreSQL |
+| "Database does not exist" | init-db didn't run | Check init-db logs |
+| Init script not running | Wrong entrypoint | Check volume mount and executable permissions |
 
-The `scripts/init-db.sh` script automatically creates the database if it doesn't exist when running locally with Docker.
+## PostgreSQL Best Practices
 
-## Ongoing Project Maintenance
-
-**IMPORTANT: Keep documentation updated as you work, not after.**
-
-When making changes to projects created from this starter:
-
-1. **Update CHANGELOG.md** - Do this IMMEDIATELY after completing each change:
-   - `### Added` - new features
-   - `### Changed` - changes to existing features
-   - `### Fixed` - bug fixes
-   - `### Removed` - removed features
-   - `### Notes` - important learnings, challenges encountered, or architectural decisions
-   - Include dates for releases (use `## [1.0.0] - 2024-01-15` format)
-
-2. **Update CLAUDE.md** when:
-   - Adding new endpoints or features (document them in Project Overview)
-   - Changing project structure (update the tree)
-   - Adding new environment variables (add to the table)
-   - Adding new common tasks or commands
-   - Encountering important gotchas or learnings (add to Important Notes)
-
-3. **Update README.md** when:
-   - Adding new API endpoints
-   - Changing setup/deployment steps
-   - Adding new prerequisites or dependencies
-
-4. **Update GOTCHAS.md** when:
-   - You get stuck in a loop or have to undo work
-   - Something doesn't work as expected
-   - You discover confusing behavior or edge cases
-   - Write a brief post-mortem: what happened, why, and how to avoid it
-
-5. **Git commits**: Commit changes locally but DO NOT push to origin without explicit user permission. After committing, remind the user to push if they want to update the remote repository.
-
-## Important Notes
-
-1. **Don't modify fly.toml app name manually** - It gets set by `fly launch`
-2. **DATABASE_URL format**: `postgres://user:password@host:port/database`
-3. **Local dev uses host.docker.internal** to connect from Docker to host PostgreSQL
-4. **The init-db service only runs locally** - Fly.io doesn't need it because `fly postgres attach` creates the database
+1. **Connection strings**: `postgres://user:password@host:port/database`
+2. **Default credentials** (local dev only): `postgres:postgres`
+3. **One database per project**: Each project gets its own database name on the shared PostgreSQL
+4. **Migrations**: Put in `scripts/` folder, run via init-db service
