@@ -1,8 +1,6 @@
 # CLAUDE.md
 
-Instructions for Claude Code when working with this codebase. This file contains generic workflow guidance that can be synced across projects.
-
-For project-specific details, see [SPEC.md](SPEC.md).
+Instructions for Claude Code. For project-specific details, see [SPEC.md](SPEC.md).
 
 ## Initializing a New Project
 
@@ -44,48 +42,14 @@ When a user clones this repo to start a new project, you MUST:
 
 ## Documentation Maintenance
 
-**IMPORTANT: Keep documentation updated as you work, not after.**
+**Keep docs updated as you work, not after.**
 
-### Files to Update
-
-| File | When to Update | What to Update |
-|------|----------------|----------------|
-| **CHANGELOG.md** | After EVERY significant change | New features, fixes, changes, learnings |
-| **SPEC.md** | When project details change | Endpoints, structure, env vars, commands |
-| **README.md** | When user-facing details change | Setup steps, API docs, prerequisites |
-| **GOTCHAS.md** | When you encounter problems | Post-mortems, confusing behaviors, fixes |
-
-### CHANGELOG.md Format
-
-```markdown
-## [Unreleased]
-
-### Added
-- New feature description
-
-### Changed
-- What changed and why
-
-### Fixed
-- Bug that was fixed
-
-### Removed
-- What was removed
-
-### Notes
-- Important learnings or decisions
-```
-
-Include dates for releases: `## [1.0.0] - 2024-01-15`
-
-### GOTCHAS.md Format
-
-When you encounter a problem, add:
-- **Date**: When it happened
-- **Problem**: What went wrong
-- **Cause**: Why it happened
-- **Solution**: How it was fixed
-- **Prevention**: How to avoid it in the future
+| File | When to Update |
+|------|----------------|
+| **CHANGELOG.md** | After every significant change |
+| **SPEC.md** | When project details change |
+| **README.md** | When user-facing details change |
+| **GOTCHAS.md** | When you encounter problems |
 
 ## Git Workflow
 
@@ -203,22 +167,10 @@ docker compose up
 
 ### Key Principles
 
-1. **PostgreSQL runs on HOST machine** - shared across all projects
-   - Use `host.docker.internal:5432` for container-to-host connections
-   - Each project uses a different database NAME (not a different PostgreSQL instance)
-
-2. **Service dependencies**:
-   - `init-db` creates the database if it doesn't exist, runs migrations, then exits
-   - `app` waits for `init-db` to complete successfully
-
-3. **One PostgreSQL, many databases**:
-   - Host runs single PostgreSQL instance on port 5432
-   - Each project creates its own database (e.g., `myapp`, `project2`, etc.)
-   - No port conflicts, no wasted resources
-
-4. **`host.docker.internal`**:
-   - Special DNS name that resolves to the host machine from inside Docker
-   - Requires `extra_hosts: ["host.docker.internal:host-gateway"]` in docker-compose
+1. **PostgreSQL runs on HOST machine** — shared across all projects via `host.docker.internal:5432`
+2. **One PostgreSQL, many databases** — each project uses a different database NAME
+3. **init-db service** — creates database and runs migrations, then exits
+4. **app service** — waits for init-db to complete before starting
 
 ### Common Issues
 
@@ -230,7 +182,7 @@ docker compose up
 
 ## PostgreSQL Best Practices
 
-1. **Connection strings**: `postgres://user:password@host:port/database`
-2. **Default credentials** (local dev only): `postgres:postgres`
-3. **One database per project**: Each project gets its own database name on the shared PostgreSQL
-4. **Migrations**: Put in `scripts/` folder, run via init-db service
+- **Connection strings**: `postgres://user:password@host:port/database`
+- **Default credentials** (local dev only): `postgres:postgres`
+- **One database per project** on the shared host PostgreSQL
+- **Migrations**: Put in `scripts/` folder, run via init-db service
