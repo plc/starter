@@ -53,6 +53,7 @@ When a user clones this repo to start a new project, you MUST:
 
 ## Git Workflow
 
+- **Update CHANGELOG.md before committing** — include it in the same commit as your changes
 - **Commit** changes locally after completing work
 - **DO NOT push** to origin without explicit user permission
 - After committing, remind the user to push if they want to update the remote

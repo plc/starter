@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - Updated Fly.io deployment instructions to use Managed Postgres instead of old Fly Postgres
 - Compacted CLAUDE.md to reduce token usage (no info lost)
+- Added explicit reminder to update CHANGELOG before committing
 
 ### Notes
 - Uses `host.docker.internal` to connect to host PostgreSQL (not a separate container)
