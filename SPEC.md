@@ -36,6 +36,8 @@ curl http://127.0.0.1:3000/health
 fly deploy
 ```
 
+For first-time setup, see [fly-deploy.md](fly-deploy.md).
+
 ## API Endpoints
 
 | Endpoint | Description |
@@ -76,9 +78,11 @@ When adding features:
 ## Database
 
 - **Local**: PostgreSQL runs on host machine (accessed via `host.docker.internal:5432`)
-- **Production**: Fly Postgres (DATABASE_URL set by `fly postgres attach`)
+- **Production**: Fly Managed Postgres (DATABASE_URL set manually via `fly secrets set`)
 
 The `scripts/init-db.sh` creates the database if needed and runs migrations.
+
+See [fly-deploy.md](fly-deploy.md) for Fly Postgres setup.
 
 ## Important Notes
 

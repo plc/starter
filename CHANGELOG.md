@@ -14,12 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Docker development environment with auto-database creation
 - Fly.io deployment configuration
 - Deterministic port generation (`scripts/get-port.sh`) - each project gets a unique port (3000-3999) based on its name
+- Comprehensive Fly.io Managed Postgres (MPG) documentation (`fly-deploy.md`)
+
+### Changed
+- Updated Fly.io deployment instructions to use Managed Postgres instead of old Fly Postgres
 
 ### Notes
 - Uses `host.docker.internal` to connect to host PostgreSQL (not a separate container)
 - Database auto-created by `init-db` service on `docker compose up`
 - Run `fly launch` before `fly deploy` to create the app on Fly.io
 - Port is generated from project name hash to avoid conflicts when running multiple projects
+- **Fly Postgres has two products**: Managed Postgres (MPG) is current/recommended; old Fly Postgres is legacy
+- MPG clusters are NOT Fly apps — use `fly mpg` commands, not `fly postgres` commands
 
 ---
 

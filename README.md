@@ -9,6 +9,7 @@ A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deploymen
 - **[CLAUDE.md](CLAUDE.md)** - Instructions for Claude Code AI assistant. Workflow and maintenance guidelines.
 - **[CHANGELOG.md](CHANGELOG.md)** - Project history, changes, and learnings.
 - **[GOTCHAS.md](GOTCHAS.md)** - Known issues, confusing behaviors, and post-mortems.
+- **[fly-deploy.md](fly-deploy.md)** - Fly.io deployment reference and troubleshooting.
 
 ## What's Included
 
@@ -142,67 +143,42 @@ npm test
 
 ## Deploy to Fly.io
 
+> **See [fly-deploy.md](fly-deploy.md) for complete reference and troubleshooting.**
+
 ### First-Time Setup
 
-1. **Install Fly CLI**:
+1. **Install Fly CLI** and login:
    ```bash
    # macOS
    brew install flyctl
-
-   # Linux
-   curl -L https://fly.io/install.sh | sh
-
-   # Windows
-   pwsh -Command "iwr https://fly.io/install.ps1 -useb | iex"
-   ```
-
-2. **Login to Fly**:
-   ```bash
    fly auth login
    ```
 
-3. **Launch your app**:
+2. **Launch your app**:
    ```bash
    fly launch
+   # - Choose app name and region
+   # - Say NO to Postgres (we create it separately)
+   # - Say NO to deploy now
    ```
-   When prompted:
-   - Choose your app name and region
-   - Say **No** to creating a Postgres database now
-   - Say **No** to deploying now
 
-4. **Create a Postgres database**:
-   ```bash
-   fly postgres create --name my-project-db
-   ```
-   - Choose the same region as your app
-   - Choose "Development" for testing
+3. **Create Managed Postgres** (via Dashboard):
+   - Go to https://fly.io/dashboard → Postgres → Create
+   - Choose same region as your app
+   - Note the **cluster ID** and copy the **connection string** from Connect tab
 
-5. **Attach the database to your app**:
+4. **Set DATABASE_URL and deploy**:
    ```bash
-   fly postgres attach my-project-db
-   ```
-   This automatically sets the `DATABASE_URL` secret.
-
-6. **Deploy**:
-   ```bash
+   fly secrets set DATABASE_URL="postgres://postgres:PASSWORD@CLUSTER.pooler.fly.io:5432/fly-db?sslmode=require"
    fly deploy
    ```
 
 ### Verify Deployment
 
 ```bash
-# Check status
 fly status
-
-# View logs
 fly logs
-
-# Open in browser
 fly open
-
-# Test endpoints
-curl https://your-app-name.fly.dev/health
-curl https://your-app-name.fly.dev/health/db
 ```
 
 ### Subsequent Deploys
@@ -210,6 +186,17 @@ curl https://your-app-name.fly.dev/health/db
 ```bash
 fly deploy
 ```
+
+### ⚠️ Important: Fly Postgres Products
+
+Fly has **two Postgres products**. Use **Managed Postgres (MPG)** — it's the current recommended option.
+
+- Create via **Dashboard**, not `fly postgres create`
+- Use `fly mpg list` (not `fly postgres list`)
+- Use `fly mpg connect <cluster-id>` (not `fly proxy`)
+- Database name is always `fly-db`
+
+See [fly-deploy.md](fly-deploy.md) for details.
 
 ## Troubleshooting
 
@@ -226,9 +213,10 @@ fly deploy
    docker compose logs init-db
    ```
 
-3. **Fly.io**: Make sure you attached the database:
+3. **Fly.io**: Make sure DATABASE_URL is set:
    ```bash
-   fly postgres attach <db-name>
+   fly secrets list
+   # If missing, set it manually (see fly-deploy.md)
    ```
 
 ### Port already in use
