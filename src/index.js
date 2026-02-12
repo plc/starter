@@ -1,36 +1,45 @@
 /**
- * Main Express server
+ * CalDave — Calendar-as-a-service API for AI agents
  *
- * This is the entry point for the application. It sets up:
- * - Express.js web server
- * - PostgreSQL database connection pool
+ * Entry point. Sets up Express server with:
+ * - Schema initialization on startup
+ * - Auth middleware (Bearer token)
+ * - Rate limit stub headers
+ * - Route modules (agents, calendars, events)
  * - Health check endpoints
- * - Status page at /
+ * - Status page
  *
  * Environment variables:
  * - PORT: Server port (default: 3000)
  * - DATABASE_URL: PostgreSQL connection string
+ * - CALDAVE_DOMAIN: Domain for calendar emails (default: caldave.fly.dev)
  */
 
 const express = require('express');
-const { Pool } = require('pg');
+const { pool, initSchema } = require('./db');
+const auth = require('./middleware/auth');
+const rateLimitStub = require('./middleware/rateLimitStub');
+const agentsRouter = require('./routes/agents');
+const calendarsRouter = require('./routes/calendars');
+const eventsRouter = require('./routes/events');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// PostgreSQL connection pool
-// Uses DATABASE_URL environment variable for connection string
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
+// ---------------------------------------------------------------------------
 // Middleware
+// ---------------------------------------------------------------------------
+
 app.use(express.json());
+app.use(rateLimitStub);
+
+// ---------------------------------------------------------------------------
+// Public routes (no auth)
+// ---------------------------------------------------------------------------
 
 /**
  * GET /health
- * Basic health check - returns OK if server is running
- * Does not check database connection
+ * Basic health check — returns OK if server is running.
  */
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -38,8 +47,7 @@ app.get('/health', (req, res) => {
 
 /**
  * GET /health/db
- * Database health check - verifies PostgreSQL connection
- * Returns database time and version if connected
+ * Database health check — verifies PostgreSQL connection.
  */
 app.get('/health/db', async (req, res) => {
   try {
@@ -55,24 +63,19 @@ app.get('/health/db', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       status: 'error',
-      database: {
-        connected: false,
-        error: error.message,
-      },
+      database: { connected: false, error: error.message },
     });
   }
 });
 
 /**
  * GET /
- * Status page - displays server and database health in HTML
- * Shows green indicators for working services, red for failures
+ * Status page — dark-themed HTML dashboard showing server + DB health.
  */
 app.get('/', async (req, res) => {
-  const appName = process.env.npm_package_name || 'myapp';
+  const appName = 'CalDave';
   const serverTime = new Date().toISOString();
 
-  // Check database connection
   let dbStatus = { connected: false, time: null, version: null, error: null };
   try {
     const result = await pool.query('SELECT NOW() as time, version() as version');
@@ -86,7 +89,6 @@ app.get('/', async (req, res) => {
     dbStatus.error = error.message;
   }
 
-  // Render status page HTML
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -161,8 +163,12 @@ app.get('/', async (req, res) => {
 
     <div class="card endpoints">
       <h2>API Endpoints</h2>
-      <a href="/health"><code>GET /health</code> - Server health check</a>
-      <a href="/health/db"><code>GET /health/db</code> - Database health check</a>
+      <a href="/health"><code>GET /health</code> — Server health check</a>
+      <a href="/health/db"><code>GET /health/db</code> — Database health check</a>
+      <a><code>POST /agents</code> — Create agent (get API key)</a>
+      <a><code>POST /calendars</code> — Create calendar</a>
+      <a><code>GET /calendars</code> — List calendars</a>
+      <a><code>GET /calendars/:id/upcoming</code> — Upcoming events</a>
     </div>
   </div>
 </body>
@@ -171,7 +177,42 @@ app.get('/', async (req, res) => {
   res.send(html);
 });
 
-// Start server on all interfaces (0.0.0.0) for Docker compatibility
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+// Agent provisioning (no auth)
+app.use('/agents', agentsRouter);
+
+// ---------------------------------------------------------------------------
+// Authenticated routes
+// ---------------------------------------------------------------------------
+
+app.use('/calendars', auth, calendarsRouter);
+// Event routes are nested under /calendars/:id but handled by eventsRouter
+app.use('/calendars', auth, eventsRouter);
+
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
+
+// ---------------------------------------------------------------------------
+// Startup
+// ---------------------------------------------------------------------------
+
+async function start() {
+  try {
+    await initSchema();
+    console.log('Database schema initialized');
+  } catch (err) {
+    console.error('Failed to initialize schema:', err.message);
+    console.error('Server starting without schema — DB may not be ready yet');
+  }
+
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`CalDave running on port ${port}`);
+  });
+}
+
+start();

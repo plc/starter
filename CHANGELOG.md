@@ -7,28 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- Initial project setup
-- Express.js server with health check endpoints (`/health`, `/health/db`)
-- Status page at `/` showing server and database health
-- PostgreSQL database connection
-- Docker development environment with auto-database creation
-- Fly.io deployment configuration
-- Deterministic port generation (`scripts/get-port.sh`) - each project gets a unique port (3000-3999) based on its name
-- Comprehensive Fly.io Managed Postgres (MPG) documentation (`fly-deploy.md`)
+- **CalDave v1 core API** — calendar-as-a-service for AI agents
+- Agent provisioning (`POST /agents`) with API key generation (nanoid + SHA-256 hash)
+- Bearer token authentication middleware
+- Calendar CRUD (`POST/GET/PATCH/DELETE /calendars`)
+- Event CRUD (`POST/GET/PATCH/DELETE /calendars/:id/events`)
+- Polling endpoint (`GET /calendars/:id/upcoming`) with ISO 8601 duration
+- Invite response endpoint (`POST /calendars/:id/events/:id/respond`)
+- Database schema auto-initialization on startup (agents, calendars, events tables)
+- Agent scoping — each agent only sees their own calendars and events
+- Rate limit stub headers (X-RateLimit-*)
+- Event size limits (64KB description, 16KB metadata)
+- Calendar email address generation (deferred inbound email, but addresses created)
+- Full API spec in `CALDAVE_SPEC.md`
 
 ### Changed
-- Changed local PostgreSQL username from `postgres` to `plc` across all config and docs
-- Updated Fly.io deployment instructions to use Managed Postgres instead of old Fly Postgres
-- Compacted CLAUDE.md to reduce token usage (no info lost)
-- Added explicit reminder to update CHANGELOG before committing
+- Renamed project from `myapp` to `caldave`
+- Rewrote `src/index.js` to mount modular routes
+- Restructured `src/` into `lib/`, `middleware/`, `routes/` directories
+- Updated status page to show CalDave API endpoints
+- Rewrote all documentation for CalDave (README, SPEC, CLAUDE.md, GOTCHAS, Dockerfile, package.json)
+- Moved project out of `starter/` subdirectory into repo root
 
 ### Notes
-- Uses `host.docker.internal` to connect to host PostgreSQL (not a separate container)
-- Database auto-created by `init-db` service on `docker compose up`
-- Run `fly launch` before `fly deploy` to create the app on Fly.io
-- Port is generated from project name hash to avoid conflicts when running multiple projects
-- **Fly Postgres has two products**: Managed Postgres (MPG) is current/recommended; old Fly Postgres is legacy
-- MPG clusters are NOT Fly apps — use `fly mpg` commands, not `fly postgres` commands
+- Schema uses `CREATE TABLE IF NOT EXISTS` — no migration tool needed for v1
+- nanoid (v5) used for all ID generation with alphanumeric alphabet
+- API keys use SHA-256 (not bcrypt) for deterministic lookup by hash
+- Webhook columns exist in schema but webhook delivery is deferred
+- Port 3720 generated from `get-port.sh caldave`
 
 ---
 

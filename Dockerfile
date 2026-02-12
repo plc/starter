@@ -1,10 +1,10 @@
-# Dockerfile for Node.js application
+# Dockerfile for CalDave
 #
-# This builds a minimal production image using Node.js 20 on Alpine Linux.
-# The image only includes production dependencies (no devDependencies).
+# Builds a minimal production image using Node.js 20 on Alpine Linux.
+# Only includes production dependencies (no devDependencies).
 #
-# Build: docker build -t myapp .
-# Run:   docker run -p 3000:3000 -e DATABASE_URL=... myapp
+# Build: docker build -t caldave .
+# Run:   docker run -p 3720:3720 -e DATABASE_URL=... -e PORT=3720 caldave
 
 FROM node:20-alpine
 

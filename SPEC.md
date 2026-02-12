@@ -1,93 +1,98 @@
-# SPEC.md
+# SPEC.md — CalDave
 
-Project-specific details and context. This file is unique to each project.
-
-## Project Overview
-
-This is a Node.js starter template with:
-- Express.js web server
-- PostgreSQL database
-- Docker for local development
-- Fly.io for production deployment
+Calendar-as-a-service API for AI agents. Agents own calendars, create events, and poll for upcoming events via REST API.
 
 ## Common Tasks
 
-### Start Local Development Server
-
 ```bash
+# Start local dev server (requires Postgres on host)
 docker compose up --build
-```
+# Or without Docker:
+DATABASE_URL=postgres://plc:postgres@localhost:5432/caldave PORT=3720 npm run dev
 
-The server runs at http://127.0.0.1:$PORT (port is set in .env)
+# Test health
+curl http://127.0.0.1:3720/health
 
-### Run Tests
+# Create an agent
+curl -X POST http://127.0.0.1:3720/agents
 
-```bash
-# With server running
-npm test
-
-# Or use curl
-curl http://127.0.0.1:3000/health
-```
-
-### Deploy
-
-```bash
+# Deploy
 fly deploy
 ```
 
-For first-time setup, see [fly-deploy.md](fly-deploy.md).
-
 ## API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Status page showing server and database health |
-| `GET /health` | JSON health check (server only) |
-| `GET /health/db` | JSON health check (server + database) |
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /` | No | Status page |
+| `GET /health` | No | Server health check |
+| `GET /health/db` | No | Database health check |
+| `POST /agents` | No | Create agent (returns API key) |
+| `POST /calendars` | Yes | Create calendar |
+| `GET /calendars` | Yes | List agent's calendars |
+| `GET /calendars/:id` | Yes | Get calendar details |
+| `PATCH /calendars/:id` | Yes | Update calendar |
+| `DELETE /calendars/:id` | Yes | Delete calendar + events |
+| `POST /calendars/:id/events` | Yes | Create event |
+| `GET /calendars/:id/events` | Yes | List events (filterable) |
+| `GET /calendars/:id/events/:eid` | Yes | Get single event |
+| `PATCH /calendars/:id/events/:eid` | Yes | Update event |
+| `DELETE /calendars/:id/events/:eid` | Yes | Delete event |
+| `GET /calendars/:id/upcoming` | Yes | Next N events from now |
+| `POST /calendars/:id/events/:eid/respond` | Yes | Accept/decline invite |
+
+Auth = `Authorization: Bearer <api_key>`
 
 ## Project Structure
 
 ```
-src/index.js        - Main Express server with routes
-src/healthcheck.js  - Health check script
-scripts/init-db.sh  - Database initialization (Docker only)
-scripts/get-port.sh - Deterministic port generation from project name
-Dockerfile          - Production container
-docker-compose.yml  - Local development
-fly.toml            - Fly.io configuration
+src/
+├── index.js              — Express server, routes, status page
+├── healthcheck.js        — Health check script (npm test)
+├── db.js                 — Postgres pool + schema init
+├── lib/
+│   ├── ids.js            — nanoid-based ID generation (agt_, cal_, evt_)
+│   └── keys.js           — SHA-256 API key hashing
+├── middleware/
+│   ├── auth.js           — Bearer token auth
+│   └── rateLimitStub.js  — Stub rate limit headers
+└── routes/
+    ├── agents.js         — POST /agents
+    ├── calendars.js      — Calendar CRUD
+    └── events.js         — Event CRUD + upcoming + respond
+scripts/
+├── init-db.sh            — Creates DB if not exists (Docker)
+└── get-port.sh           — Deterministic port from project name
 ```
 
-## Key Files to Modify
+## Database Schema
 
-When adding features:
+Three tables: `agents`, `calendars`, `events`. Schema auto-created on startup.
 
-- **src/index.js** - Add new routes and endpoints
-- **package.json** - Add new dependencies
-- **docker-compose.yml** - Add new services or environment variables
-- **fly.toml** - Modify deployment settings
+See `CALDAVE_SPEC.md` for full column definitions.
+
+Key indexes: `events(calendar_id, start_time)`, `events(calendar_id, status)`, `calendars(email)`, `calendars(agent_id)`.
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (generated from project name via `scripts/get-port.sh`) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DB_NAME` | Database name for init script |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port (CalDave uses 3720) |
+| `DATABASE_URL` | — | Postgres connection string |
+| `DB_NAME` | `caldave` | Database name for init script |
+| `CALDAVE_DOMAIN` | `caldave.fly.dev` | Domain for calendar email addresses |
 
-## Database
+## Auth Model
 
-- **Local**: PostgreSQL runs on host machine (accessed via `host.docker.internal:5432`)
-- **Production**: Fly Managed Postgres (DATABASE_URL set manually via `fly secrets set`)
+- API keys: `sk_live_` prefix + 32 alphanumeric chars
+- Stored as SHA-256 hash (direct DB lookup, no iteration)
+- Agent scoping: each agent only sees their own calendars/events
 
-The `scripts/init-db.sh` creates the database if needed and runs migrations.
+## Deferred (not in v1)
 
-See [fly-deploy.md](fly-deploy.md) for Fly Postgres setup.
-
-## Important Notes
-
-1. **Don't modify fly.toml app name manually** - It gets set by `fly launch`
-2. **DATABASE_URL format**: `postgres://user:password@host:port/database`
-3. **Local uses `host.docker.internal`** - Connects to host PostgreSQL, not a containerized one
-4. **One PostgreSQL, many databases** - Each project has its own database name
-5. **Deterministic ports** - Each project gets a unique port (3000-3999) based on its name to avoid conflicts
+- Recurring events / RRULE expansion
+- Inbound email parsing
+- Webhooks / push notifications (pg-boss)
+- iCal feed generation
+- MCP tools
+- Real rate limiting (headers are stubbed)

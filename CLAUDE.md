@@ -1,44 +1,36 @@
 # CLAUDE.md
 
-Instructions for Claude Code. For project-specific details, see [SPEC.md](SPEC.md).
+Instructions for Claude Code. For project-specific details, see [SPEC.md](SPEC.md). For the full API spec, see [CALDAVE_SPEC.md](CALDAVE_SPEC.md).
 
-## Initializing a New Project
+## Project Overview
 
-When a user clones this repo to start a new project, you MUST:
+CalDave is a calendar-as-a-service API for AI agents. The stack is Node.js + Express + PostgreSQL + Docker, deployed on Fly.io.
 
-1. **Rename `myapp` to the project name**:
-   ```bash
-   sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example
-   ```
+### Key Architecture Details
 
-2. **Set a deterministic port** (avoids conflicts when running multiple projects):
-   ```bash
-   PORT=$(./scripts/get-port.sh PROJECT_NAME)
-   sed -i '' "s/PORT=3000/PORT=$PORT/" .env.example
-   cp .env.example .env
-   ```
+- **Schema-on-startup**: Tables are created via `CREATE TABLE IF NOT EXISTS` in `src/db.js` — no migration tool
+- **Auth**: API keys are SHA-256 hashed and looked up directly by hash (not bcrypt)
+- **IDs**: nanoid with prefixes (`agt_`, `cal_`, `evt_`, `feed_`, `sk_live_`)
+- **Database**: PostgreSQL runs on the **host machine**, not in Docker — accessed via `host.docker.internal:5432`
+- **Port**: 3720 (generated from `./scripts/get-port.sh caldave`)
 
-3. **Rewrite SPEC.md** with project-specific content:
-   - Update the project name and description
-   - Keep the structure (Common Tasks, Project Structure, Environment Variables, etc.)
-   - The goal: future Claude sessions should understand this specific project
+## Common Tasks
 
-4. **Rewrite README.md**:
-   - Change title from "Starter" to the project name
-   - Write a clear description of what THIS project does
-   - Keep the Documentation links section
-   - Remove "Customizing for Your Project" section
+```bash
+# Start local dev server
+docker compose up --build
+# Or without Docker:
+DATABASE_URL=postgres://plc:postgres@localhost:5432/caldave PORT=3720 npm run dev
 
-5. **Update CHANGELOG.md** with initial project setup
+# Test health
+curl http://127.0.0.1:3720/health
 
-6. **Clear GOTCHAS.md** example content (keep the template structure)
+# Create an agent
+curl -s -X POST http://127.0.0.1:3720/agents
 
-7. **Start the server**:
-   ```bash
-   docker compose up --build
-   ```
-
-8. **Verify at http://127.0.0.1:$PORT** (use the port from step 2)
+# Deploy to Fly.io
+fly deploy
+```
 
 ## Documentation Maintenance
 
@@ -47,7 +39,8 @@ When a user clones this repo to start a new project, you MUST:
 | File | When to Update |
 |------|----------------|
 | **CHANGELOG.md** | After every significant change |
-| **SPEC.md** | When project details change |
+| **SPEC.md** | When project structure, endpoints, or env vars change |
+| **CALDAVE_SPEC.md** | When API contract changes (new endpoints, schema changes) |
 | **README.md** | When user-facing details change |
 | **GOTCHAS.md** | When you encounter problems |
 
@@ -76,7 +69,7 @@ fly launch
 1. Go to https://fly.io/dashboard → Postgres → Create
 2. Choose a name and region (same region as your app)
 3. Note the **cluster ID** (e.g., `abc123xyz`) — needed for CLI access
-4. Go to **Extensions** tab → enable any needed extensions (e.g., "vector" for pgvector)
+4. Go to **Extensions** tab → enable any needed extensions
 5. Go to **Connect** tab → copy the connection string
 
 ### Step 3: Set DATABASE_URL Secret
@@ -94,7 +87,7 @@ fly open  # Verify
 
 For subsequent deploys: `fly deploy`
 
-### ⚠️ Fly Postgres: Two Different Products
+### Fly Postgres: Two Different Products
 
 Fly has **two separate Postgres products** with different CLI commands:
 
@@ -102,7 +95,7 @@ Fly has **two separate Postgres products** with different CLI commands:
 |--------------------|-----------------------------|-----------------------------|
 | **Status**         | Current, recommended        | Legacy                      |
 | **Created via**    | Dashboard or `fly mpg create` | `fly postgres create`     |
-| **Is a Fly app?**  | ❌ No                       | ✅ Yes                      |
+| **Is a Fly app?**  | No                          | Yes                         |
 | **Listed by**      | `fly mpg list`              | `fly postgres list`         |
 | **Connect via**    | `fly mpg connect <cluster-id>` | `fly postgres connect -a <app>` |
 | **Attach to app**  | Manual `fly secrets set`    | `fly postgres attach`       |
@@ -135,7 +128,7 @@ psql "postgres://postgres:PASSWORD@localhost:15432/fly-db"
 fly mpg connect <cluster-id> --port 15432
 
 # Terminal 2: Dump and restore
-docker exec PROJECT_NAME-db-1 pg_dump -U plc --clean --if-exists DATABASE_NAME > backup.sql
+pg_dump -U plc --clean --if-exists caldave > backup.sql
 psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
 ```
 
@@ -148,16 +141,14 @@ psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
 | Can't connect with `fly proxy` | MPG uses different command | Use `fly mpg connect <cluster-id> --port 15432` |
 | "role postgres does not exist" on deploy | DATABASE_URL secret not set | Run `fly secrets set DATABASE_URL="..."` |
 
-## Docker Best Practices
-
-### Architecture
+## Docker Architecture
 
 ```
 docker compose up
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
 │       init-db (one-shot) ──────→ app (node.js)         │
-│          migrations               port $PORT            │
+│          creates DB               port $PORT            │
 │              │                        │                 │
 └──────────────│────────────────────────│─────────────────┘
                │                        │
@@ -170,20 +161,13 @@ docker compose up
 
 1. **PostgreSQL runs on HOST machine** — shared across all projects via `host.docker.internal:5432`
 2. **One PostgreSQL, many databases** — each project uses a different database NAME
-3. **init-db service** — creates database and runs migrations, then exits
+3. **init-db service** — creates database, then exits
 4. **app service** — waits for init-db to complete before starting
+5. **Schema init** — tables created by the app on startup, not by init-db
 
-### Common Issues
-
-| Problem | Cause | Solution |
-|---------|-------|----------|
-| "Connection refused" | PostgreSQL not running on host | Start host PostgreSQL |
-| "Database does not exist" | init-db didn't run | Check init-db logs |
-| Init script not running | Wrong entrypoint | Check volume mount and executable permissions |
-
-## PostgreSQL Best Practices
+## PostgreSQL
 
 - **Connection strings**: `postgres://user:password@host:port/database`
 - **Default credentials** (local dev only): `plc:postgres`
-- **One database per project** on the shared host PostgreSQL
-- **Migrations**: Put in `scripts/` folder, run via init-db service
+- **Database name**: `caldave`
+- **Schema**: Auto-created on app startup — see `src/db.js`

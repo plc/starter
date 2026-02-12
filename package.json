@@ -1,17 +1,24 @@
 {
-  "name": "myapp",
+  "name": "caldave",
   "version": "1.0.0",
-  "description": "Node.js app with PostgreSQL and Fly.io deployment",
+  "description": "Calendar-as-a-service API for AI agents",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node src/healthcheck.js"
   },
-  "keywords": ["nodejs", "postgres", "fly", "docker", "starter"],
+  "keywords": [
+    "calendar",
+    "api",
+    "agents",
+    "nodejs",
+    "postgres"
+  ],
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
+    "nanoid": "^5.1.6",
     "pg": "^8.11.3"
   }
 }
