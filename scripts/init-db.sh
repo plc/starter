@@ -14,7 +14,7 @@
 set -e
 
 DB_NAME="${DB_NAME:-myapp}"
-DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@host.docker.internal:5432/myapp}"
+DATABASE_URL="${DATABASE_URL:-postgres://plc:postgres@host.docker.internal:5432/myapp}"
 
 # Connect to 'postgres' database to create the target database
 BASE_URL=$(echo "$DATABASE_URL" | sed 's|/[^/]*$|/postgres|')

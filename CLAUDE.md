@@ -135,7 +135,7 @@ psql "postgres://postgres:PASSWORD@localhost:15432/fly-db"
 fly mpg connect <cluster-id> --port 15432
 
 # Terminal 2: Dump and restore
-docker exec PROJECT_NAME-db-1 pg_dump -U postgres --clean --if-exists DATABASE_NAME > backup.sql
+docker exec PROJECT_NAME-db-1 pg_dump -U plc --clean --if-exists DATABASE_NAME > backup.sql
 psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
 ```
 
@@ -184,6 +184,6 @@ docker compose up
 ## PostgreSQL Best Practices
 
 - **Connection strings**: `postgres://user:password@host:port/database`
-- **Default credentials** (local dev only): `postgres:postgres`
+- **Default credentials** (local dev only): `plc:postgres`
 - **One database per project** on the shared host PostgreSQL
 - **Migrations**: Put in `scripts/` folder, run via init-db service

@@ -18,7 +18,7 @@ services:
   init-db:
     image: postgres:16-alpine
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
       - DB_NAME=${DB_NAME:-myapp}
     volumes:
       - ./scripts/init-db.sh:/init-db.sh:ro
@@ -32,7 +32,7 @@ services:
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
       - PORT=${PORT:-3000}
     extra_hosts:
       - "host.docker.internal:host-gateway"

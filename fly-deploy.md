@@ -54,7 +54,7 @@ Enable extensions in the Fly dashboard: Postgres → your cluster → Extensions
 fly mpg connect <cluster-id> --port 15432
 
 # Terminal 2: Dump local and restore to Fly
-pg_dump -U postgres --clean --if-exists YOUR_LOCAL_DB > backup.sql
+pg_dump -U plc --clean --if-exists YOUR_LOCAL_DB > backup.sql
 psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
 ```
 

@@ -63,7 +63,7 @@ That's it! The database is created automatically.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port (use `./scripts/get-port.sh` for deterministic port) |
-| `DATABASE_URL` | `postgres://postgres:postgres@host.docker.internal:5432/myapp` | PostgreSQL connection string |
+| `DATABASE_URL` | `postgres://plc:postgres@host.docker.internal:5432/myapp` | PostgreSQL connection string |
 | `DB_NAME` | `myapp` | Database name (used by init script) |
 
 ### Customizing for Your Project
