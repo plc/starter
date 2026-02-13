@@ -98,6 +98,9 @@ async function initSchema() {
       ON events (calendar_id, ical_uid)
       WHERE ical_uid IS NOT NULL;
 
+    -- All-day event support
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS all_day boolean NOT NULL DEFAULT false;
+
     -- Per-calendar AgentMail API key for fetching attachments
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS agentmail_api_key text;
 

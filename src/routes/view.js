@@ -37,7 +37,7 @@ router.get('/:id/view', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
 
     const { rows } = await pool.query(
-      `SELECT title, start_time, end_time, location, status FROM events
+      `SELECT title, start_time, end_time, location, status, all_day FROM events
        WHERE calendar_id = $1
          AND start_time >= now()
          AND status NOT IN ('cancelled', 'recurring')
@@ -59,9 +59,11 @@ router.get('/:id/view', async (req, res) => {
       out += 'No upcoming events.\n';
     } else {
       for (const r of rows) {
+        const startStr = r.all_day ? new Date(r.start_time).toISOString().slice(0, 10) : fmtDate(r.start_time);
+        const endStr = r.all_day ? (() => { const d = new Date(r.end_time); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })() : fmtDate(r.end_time);
         out += pad(r.title || '(untitled)', tw)
-          + pad(fmtDate(r.start_time), sw)
-          + pad(fmtDate(r.end_time), ew)
+          + pad(startStr, sw)
+          + pad(endStr, ew)
           + pad(r.location || '—', lw)
           + pad(r.status || 'confirmed', stw)
           + '\n';

@@ -91,6 +91,16 @@ Events can include a `recurrence` field (RFC 5545 RRULE string, e.g. `FREQ=DAILY
 - Max 1000 instances per 90-day window (rejects very high-frequency rules)
 - Inbound email invites with RRULE are created as recurring events (same materialization as API-created)
 
+## All-Day Events
+
+Events can be created with `all_day: true`. When set:
+- `start` and `end` must be date-only strings (`YYYY-MM-DD`)
+- `end` is inclusive (e.g. `start: "2025-03-15", end: "2025-03-15"` = one-day event)
+- Internally stored as midnight-UTC timestamps with exclusive end (iCal convention)
+- Inbound email invites with `VALUE=DATE` are automatically detected as all-day
+- iCal feeds emit `DTSTART;VALUE=DATE` for all-day events
+- Supports recurring all-day events (e.g. weekly holidays)
+
 ## Environment Variables
 
 | Variable | Default | Description |

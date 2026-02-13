@@ -58,7 +58,7 @@ router.get('/:calendar_id.ics', async (req, res) => {
     });
 
     for (const evt of evtResult.rows) {
-      const event = calendar.createEvent({
+      const eventOpts = {
         id: evt.id,
         start: evt.start_time,
         end: evt.end_time,
@@ -66,7 +66,13 @@ router.get('/:calendar_id.ics', async (req, res) => {
         description: evt.description || undefined,
         location: evt.location || undefined,
         timestamp: evt.created_at,
-      });
+      };
+
+      if (evt.all_day) {
+        eventOpts.allDay = true;
+      }
+
+      const event = calendar.createEvent(eventOpts);
 
       if (evt.attendees) {
         const attendees = typeof evt.attendees === 'string'

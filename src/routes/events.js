@@ -50,14 +50,26 @@ async function verifyCalendarOwnership(req, res) {
  * Format an event row for API responses.
  */
 function formatEvent(evt) {
+  let start = evt.start_time;
+  let end = evt.end_time;
+
+  if (evt.all_day) {
+    // Convert back from exclusive midnight-UTC end to inclusive date-only strings
+    start = new Date(evt.start_time).toISOString().slice(0, 10);
+    const endDate = new Date(evt.end_time);
+    endDate.setUTCDate(endDate.getUTCDate() - 1);
+    end = endDate.toISOString().slice(0, 10);
+  }
+
   const result = {
     id: evt.id,
     calendar_id: evt.calendar_id,
     title: evt.title,
     description: evt.description,
     metadata: evt.metadata,
-    start: evt.start_time,
-    end: evt.end_time,
+    all_day: evt.all_day || undefined,
+    start,
+    end,
     location: evt.location,
     status: evt.status,
     source: evt.source,
@@ -98,8 +110,24 @@ function msToIsoDuration(ms) {
  */
 const KNOWN_EVENT_FIELDS = new Set([
   'title', 'start', 'end', 'description', 'metadata', 'location',
-  'status', 'attendees', 'recurrence',
+  'status', 'attendees', 'recurrence', 'all_day',
 ]);
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Normalize start/end for all-day events.
+ * Input: inclusive dates like "2025-03-15" (start) and "2025-03-15" (end = same day).
+ * Output: { startTime, endTime } as midnight-UTC timestamps.
+ * End is exclusive (iCal convention): "2025-03-15" → end_time = 2025-03-16T00:00:00Z.
+ */
+function normalizeAllDay(start, end) {
+  const startTime = `${start}T00:00:00Z`;
+  const d = new Date(`${end}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  const endTime = d.toISOString();
+  return { startTime, endTime };
+}
 
 /**
  * Check for unknown fields in the request body. Returns an error message
@@ -119,7 +147,7 @@ router.post('/:id/events', async (req, res) => {
     const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
-    const { title, start, end, description, metadata, location, status, attendees, recurrence } = req.body;
+    const { title, start, end, description, metadata, location, status, attendees, recurrence, all_day } = req.body;
 
     if (!title) return res.status(400).json({ error: 'title is required' });
     if (!start) return res.status(400).json({ error: 'start is required' });
@@ -137,11 +165,27 @@ router.post('/:id/events', async (req, res) => {
       return res.status(400).json({ error: 'metadata exceeds 16KB limit' });
     }
 
+    // All-day validation and normalization
+    let startTime = start;
+    let endTime = end;
+    if (all_day) {
+      if (!DATE_ONLY_RE.test(start)) {
+        return res.status(400).json({ error: 'all_day events require date-only start (YYYY-MM-DD)' });
+      }
+      if (!DATE_ONLY_RE.test(end)) {
+        return res.status(400).json({ error: 'all_day events require date-only end (YYYY-MM-DD)' });
+      }
+      if (start > end) {
+        return res.status(400).json({ error: 'start date must not be after end date' });
+      }
+      ({ startTime, endTime } = normalizeAllDay(start, end));
+    }
+
     const id = eventId();
 
     // ---- Recurring event ----
     if (recurrence) {
-      const dtstart = new Date(start);
+      const dtstart = new Date(startTime);
       const validation = parseAndValidateRRule(recurrence, dtstart);
       if (!validation.valid) {
         return res.status(400).json({ error: validation.error });
@@ -149,8 +193,8 @@ router.post('/:id/events', async (req, res) => {
 
       // Insert the parent row with status = 'recurring'
       const { rows } = await pool.query(
-        `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, source, recurrence, attendees)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'recurring', 'api', $9, $10)
+        `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, source, recurrence, attendees, all_day)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'recurring', 'api', $9, $10, $11)
          RETURNING *`,
         [
           id,
@@ -158,11 +202,12 @@ router.post('/:id/events', async (req, res) => {
           title,
           description || null,
           metadata ? JSON.stringify(metadata) : null,
-          start,
-          end,
+          startTime,
+          endTime,
           location || null,
           recurrence,
           attendees ? JSON.stringify(attendees) : null,
+          !!all_day,
         ]
       );
 
@@ -184,8 +229,8 @@ router.post('/:id/events', async (req, res) => {
 
     // ---- Regular (non-recurring) event ----
     const { rows } = await pool.query(
-      `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, source, attendees)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'api', $10)
+      `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, source, attendees, all_day)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'api', $10, $11)
        RETURNING *`,
       [
         id,
@@ -193,11 +238,12 @@ router.post('/:id/events', async (req, res) => {
         title,
         description || null,
         metadata ? JSON.stringify(metadata) : null,
-        start,
-        end,
+        startTime,
+        endTime,
         location || null,
         status || 'confirmed',
         attendees ? JSON.stringify(attendees) : null,
+        !!all_day,
       ]
     );
 
@@ -339,7 +385,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
-    const { title, description, metadata, start, end, location, status, attendees, recurrence } = req.body;
+    const { title, description, metadata, start, end, location, status, attendees, recurrence, all_day } = req.body;
 
     // Length checks
     if (title !== undefined && title.length > 500) {
@@ -357,6 +403,26 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       return res.status(400).json({ error: 'metadata exceeds 16KB limit' });
     }
 
+    // Resolve whether this event will be all_day after the patch
+    const effectiveAllDay = all_day !== undefined ? !!all_day : !!evt.all_day;
+
+    // Normalize start/end if the event is (or will be) all_day
+    let startTime = start;
+    let endTime = end;
+    if (effectiveAllDay && (start !== undefined || end !== undefined || all_day !== undefined)) {
+      const s = start !== undefined ? start : (evt.all_day ? new Date(evt.start_time).toISOString().slice(0, 10) : String(evt.start_time));
+      const e = end !== undefined ? end : (evt.all_day ? (() => { const d = new Date(evt.end_time); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })() : String(evt.end_time));
+      if (start !== undefined && !DATE_ONLY_RE.test(start)) {
+        return res.status(400).json({ error: 'all_day events require date-only start (YYYY-MM-DD)' });
+      }
+      if (end !== undefined && !DATE_ONLY_RE.test(end)) {
+        return res.status(400).json({ error: 'all_day events require date-only end (YYYY-MM-DD)' });
+      }
+      if (DATE_ONLY_RE.test(s) && DATE_ONLY_RE.test(e)) {
+        ({ startTime, endTime } = normalizeAllDay(s, e));
+      }
+    }
+
     // ---- Case A: Patching an instance (has parent_event_id) ----
     if (evt.parent_event_id) {
       if (recurrence !== undefined) {
@@ -370,11 +436,12 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       if (title !== undefined) { updates.push(`title = $${idx++}`); values.push(title); }
       if (description !== undefined) { updates.push(`description = $${idx++}`); values.push(description); }
       if (metadata !== undefined) { updates.push(`metadata = $${idx++}`); values.push(JSON.stringify(metadata)); }
-      if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(start); }
-      if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(end); }
+      if (start !== undefined || (all_day !== undefined && startTime)) { updates.push(`start_time = $${idx++}`); values.push(startTime || start); }
+      if (end !== undefined || (all_day !== undefined && endTime)) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
       if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
       if (status !== undefined) { updates.push(`status = $${idx++}`); values.push(status); }
       if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
+      if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
 
       if (updates.length === 0) {
         return res.status(400).json({ error: 'No fields to update' });
@@ -395,11 +462,11 @@ router.patch('/:id/events/:event_id', async (req, res) => {
 
     // ---- Case B: Patching a recurring parent (has recurrence) ----
     if (evt.recurrence) {
-      const needsRematerialize = recurrence !== undefined || start !== undefined || end !== undefined;
+      const needsRematerialize = recurrence !== undefined || start !== undefined || end !== undefined || all_day !== undefined;
 
       // Validate new RRULE if provided
       if (recurrence !== undefined) {
-        const dtstart = new Date(start || evt.start_time);
+        const dtstart = new Date(startTime || start || evt.start_time);
         const validation = parseAndValidateRRule(recurrence, dtstart);
         if (!validation.valid) {
           return res.status(400).json({ error: validation.error });
@@ -414,11 +481,12 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       if (title !== undefined) { updates.push(`title = $${idx++}`); values.push(title); }
       if (description !== undefined) { updates.push(`description = $${idx++}`); values.push(description); }
       if (metadata !== undefined) { updates.push(`metadata = $${idx++}`); values.push(JSON.stringify(metadata)); }
-      if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(start); }
-      if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(end); }
+      if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(startTime || start); }
+      if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
       if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
       if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
       if (recurrence !== undefined) { updates.push(`recurrence = $${idx++}`); values.push(recurrence); }
+      if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
       // Don't allow setting status on a parent (it must stay 'recurring')
       if (status !== undefined) {
         return res.status(400).json({ error: 'Cannot change status of a recurring event parent. Delete the series or modify individual instances.' });
@@ -477,11 +545,12 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     if (title !== undefined) { updates.push(`title = $${idx++}`); values.push(title); }
     if (description !== undefined) { updates.push(`description = $${idx++}`); values.push(description); }
     if (metadata !== undefined) { updates.push(`metadata = $${idx++}`); values.push(JSON.stringify(metadata)); }
-    if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(start); }
-    if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(end); }
+    if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(startTime || start); }
+    if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
     if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); values.push(status); }
     if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
+    if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

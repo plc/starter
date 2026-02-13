@@ -26,8 +26,9 @@ A calendar entry. Events have:
 - `title` — summary/subject
 - `description` — free text (supports markdown)
 - `metadata` — structured JSON payload (e.g. `{"action": "transcribe", "zoom_url": "..."}`)
-- `start` — ISO 8601 datetime with timezone
-- `end` — ISO 8601 datetime with timezone
+- `all_day` — boolean, when true `start`/`end` are date-only (`YYYY-MM-DD`) with inclusive end
+- `start` — ISO 8601 datetime with timezone, or `YYYY-MM-DD` for all-day events
+- `end` — ISO 8601 datetime with timezone, or `YYYY-MM-DD` for all-day events (inclusive)
 - `location` — optional, free text or URL
 - `status` — `confirmed` | `tentative` | `cancelled`
 - `source` — `api` | `inbound_email` — how the event was created
@@ -424,8 +425,9 @@ The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP cl
 | `title` | `text` | |
 | `description` | `text` | Nullable |
 | `metadata` | `jsonb` | Nullable, structured payload |
+| `all_day` | `boolean` | Default `false`. When true, start/end are midnight-UTC timestamps and API returns date-only strings |
 | `start_time` | `timestamptz` | |
-| `end_time` | `timestamptz` | |
+| `end_time` | `timestamptz` | For all-day events, stored as exclusive end (start+N days at midnight UTC) |
 | `location` | `text` | Nullable |
 | `status` | `text` | `confirmed` / `tentative` / `cancelled` |
 | `source` | `text` | `api` / `inbound_email` |

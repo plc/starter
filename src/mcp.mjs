@@ -152,14 +152,16 @@ server.tool(
   {
     calendar_id: z.string().describe('Calendar ID (cal_...)'),
     title: z.string().describe('Event title'),
-    start: z.string().describe('Start time (ISO 8601)'),
-    end: z.string().describe('End time (ISO 8601)'),
+    start: z.string().describe('Start time (ISO 8601), or YYYY-MM-DD for all-day events'),
+    end: z.string().describe('End time (ISO 8601), or YYYY-MM-DD for all-day events (inclusive)'),
+    all_day: z.boolean().optional().describe('Set true for all-day events (start/end must be YYYY-MM-DD)'),
     description: z.string().optional().describe('Event description'),
     location: z.string().optional().describe('Event location'),
     recurrence: z.string().optional().describe('RRULE string (e.g. FREQ=WEEKLY;BYDAY=MO)'),
   },
-  async ({ calendar_id, title, start, end, description, location, recurrence }) => {
+  async ({ calendar_id, title, start, end, all_day, description, location, recurrence }) => {
     const body = { title, start, end };
+    if (all_day) body.all_day = true;
     if (description) body.description = description;
     if (location) body.location = location;
     if (recurrence) body.recurrence = recurrence;
@@ -176,17 +178,19 @@ server.tool(
     calendar_id: z.string().describe('Calendar ID (cal_...)'),
     event_id: z.string().describe('Event ID (evt_...)'),
     title: z.string().optional().describe('New title'),
-    start: z.string().optional().describe('New start time (ISO 8601)'),
-    end: z.string().optional().describe('New end time (ISO 8601)'),
+    start: z.string().optional().describe('New start time (ISO 8601 or YYYY-MM-DD for all-day)'),
+    end: z.string().optional().describe('New end time (ISO 8601 or YYYY-MM-DD for all-day, inclusive)'),
+    all_day: z.boolean().optional().describe('Toggle all-day mode on/off'),
     description: z.string().optional().describe('New description'),
     location: z.string().optional().describe('New location'),
     status: z.string().optional().describe('New status: confirmed, tentative, cancelled'),
   },
-  async ({ calendar_id, event_id, title, start, end, description, location, status }) => {
+  async ({ calendar_id, event_id, title, start, end, all_day, description, location, status }) => {
     const body = {};
     if (title !== undefined) body.title = title;
     if (start !== undefined) body.start = start;
     if (end !== undefined) body.end = end;
+    if (all_day !== undefined) body.all_day = all_day;
     if (description !== undefined) body.description = description;
     if (location !== undefined) body.location = location;
     if (status !== undefined) body.status = status;

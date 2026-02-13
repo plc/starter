@@ -130,7 +130,7 @@ async function materializeInstances(pool, parentEvent, fromDate, toDate) {
       const id = eventId();
 
       placeholders.push(
-        `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
+        `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
       );
       values.push(
         id,
@@ -145,11 +145,12 @@ async function materializeInstances(pool, parentEvent, fromDate, toDate) {
         parentEvent.id,          // parent_event_id
         occurrenceDate,          // occurrence_date
         parentEvent.attendees ? (typeof parentEvent.attendees === 'string' ? parentEvent.attendees : JSON.stringify(parentEvent.attendees)) : null,
+        !!parentEvent.all_day,
       );
     }
 
     const result = await pool.query(
-      `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, parent_event_id, occurrence_date, attendees)
+      `INSERT INTO events (id, calendar_id, title, description, metadata, start_time, end_time, location, status, parent_event_id, occurrence_date, attendees, all_day)
        VALUES ${placeholders.join(', ')}
        ON CONFLICT (parent_event_id, occurrence_date) WHERE parent_event_id IS NOT NULL
        DO NOTHING`,

@@ -515,7 +515,9 @@ function postmarkPayload(icsContent, toEmail) {
 /**
  * Generate a minimal .ics string for testing.
  */
-function makeIcs({ method = 'REQUEST', uid, summary, dtstart, dtend, organizer, rrule }) {
+function makeIcs({ method = 'REQUEST', uid, summary, dtstart, dtend, organizer, rrule, allDay }) {
+  const startLine = allDay ? `DTSTART;VALUE=DATE:${dtstart}` : `DTSTART:${dtstart}`;
+  const endLine = allDay ? `DTEND;VALUE=DATE:${dtend}` : `DTEND:${dtend}`;
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -524,8 +526,8 @@ function makeIcs({ method = 'REQUEST', uid, summary, dtstart, dtend, organizer, 
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `SUMMARY:${summary}`,
-    `DTSTART:${dtstart}`,
-    `DTEND:${dtend}`,
+    startLine,
+    endLine,
     rrule ? `RRULE:${rrule}` : '',
     organizer ? `ORGANIZER;CN=Organizer:mailto:${organizer}` : '',
     'ATTENDEE;CN=Agent:mailto:agent@caldave.fly.dev',
@@ -1345,7 +1347,174 @@ describe('POST /man', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 23. Cleanup
+// 23. All-day events
+// ---------------------------------------------------------------------------
+
+describe('All-day events', { concurrency: 1 }, () => {
+  let allDayEvtId;
+
+  it('creates a single-day all-day event', async () => {
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Holiday', start: '2099-12-25', end: '2099-12-25', all_day: true },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.all_day, true);
+    assert.equal(data.start, '2099-12-25');
+    assert.equal(data.end, '2099-12-25');
+    allDayEvtId = data.id;
+  });
+
+  it('creates a multi-day all-day event', async () => {
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: { title: '3-Day Conf', start: '2099-07-01', end: '2099-07-03', all_day: true },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.all_day, true);
+    assert.equal(data.start, '2099-07-01');
+    assert.equal(data.end, '2099-07-03');
+    // Clean up
+    await api('DELETE', `/calendars/${state.calendarId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('rejects all_day with datetime format', async () => {
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad', start: '2099-07-01T10:00:00Z', end: '2099-07-01T11:00:00Z', all_day: true },
+    });
+    assert.equal(status, 400);
+    assert.match(data.error, /date-only/);
+  });
+
+  it('GET returns date-only format for all-day events', async () => {
+    const { status, data } = await api('GET', `/calendars/${state.calendarId}/events/${allDayEvtId}`, {
+      token: state.apiKey,
+    });
+    assert.equal(status, 200);
+    assert.equal(data.all_day, true);
+    assert.equal(data.start, '2099-12-25');
+    assert.equal(data.end, '2099-12-25');
+  });
+
+  it('PATCH can toggle all_day off', async () => {
+    const { status, data } = await api('PATCH', `/calendars/${state.calendarId}/events/${allDayEvtId}`, {
+      token: state.apiKey,
+      body: { all_day: false, start: '2099-12-25T10:00:00Z', end: '2099-12-25T11:00:00Z' },
+    });
+    assert.equal(status, 200);
+    assert.ok(!data.all_day);
+    assert.match(data.start, /T10:00:00/);
+  });
+
+  it('PATCH can toggle all_day on', async () => {
+    const { status, data } = await api('PATCH', `/calendars/${state.calendarId}/events/${allDayEvtId}`, {
+      token: state.apiKey,
+      body: { all_day: true, start: '2099-12-25', end: '2099-12-26' },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.all_day, true);
+    assert.equal(data.start, '2099-12-25');
+    assert.equal(data.end, '2099-12-26');
+  });
+
+  it('creates recurring all-day event', async () => {
+    // Use tomorrow's date so instances fall within the 90-day materialization window
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const startDate = tomorrow.toISOString().slice(0, 10);
+    const endRange = new Date(tomorrow.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: {
+        title: 'Weekly All-Day',
+        start: startDate,
+        end: startDate,
+        all_day: true,
+        recurrence: 'FREQ=WEEKLY;COUNT=4',
+      },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.all_day, true);
+    assert.equal(data.start, startDate);
+    assert.ok(data.instances_created >= 1, `Expected instances >= 1, got ${data.instances_created}`);
+
+    // Fetch instances
+    const { data: listData } = await api('GET', `/calendars/${state.calendarId}/events?start=${startDate}T00:00:00Z&end=${endRange}`, {
+      token: state.apiKey,
+    });
+    const instances = listData.events.filter(e => e.parent_event_id === data.id);
+    assert.ok(instances.length >= 1);
+    // Each instance should be all_day with date-only format
+    for (const inst of instances) {
+      assert.equal(inst.all_day, true);
+      assert.match(inst.start, /^\d{4}-\d{2}-\d{2}$/);
+      assert.match(inst.end, /^\d{4}-\d{2}-\d{2}$/);
+    }
+
+    // Clean up series
+    await api('DELETE', `/calendars/${state.calendarId}/events/${data.id}?mode=all`, { token: state.apiKey });
+  });
+
+  it('iCal feed emits VALUE=DATE for all-day events', async () => {
+    const { status, data } = await api('GET', `/feeds/${state.calendarId}.ics?token=${state.feedToken}`, { raw: true });
+    assert.equal(status, 200, `Feed returned ${status}: ${typeof data === 'string' ? data.slice(0, 100) : data}`);
+    // The allDayEvtId event (now toggled back to all_day=true) should have VALUE=DATE
+    assert.ok(data.includes('VALUE=DATE'), 'iCal feed should contain VALUE=DATE for all-day events');
+  });
+
+  it('inbound all-day invite creates all_day event', async () => {
+    const ics = makeIcs({
+      uid: 'allday-inbound@example.com',
+      summary: 'All-Day Meeting',
+      dtstart: '20990801',
+      dtend: '20990802',
+      organizer: 'boss@example.com',
+      allDay: true,
+    });
+
+    const { status: calStatus, data: calData } = await api('GET', `/calendars/${state.calendarId}`, { token: state.apiKey });
+    assert.equal(calStatus, 200, 'GET calendar should succeed');
+    assert.ok(calData.inbound_webhook_url, 'Calendar should have inbound_webhook_url');
+    const inboundToken = calData.inbound_webhook_url.split('/inbound/')[1];
+
+    const { status, data } = await api('POST', `/inbound/${inboundToken}`, {
+      body: {
+        Subject: 'All-Day Meeting',
+        TextBody: '',
+        Attachments: [{
+          ContentType: 'text/calendar',
+          Name: 'invite.ics',
+          Content: Buffer.from(ics).toString('base64'),
+        }],
+      },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.status, 'created');
+
+    // Verify the created event is all_day
+    const { data: evt } = await api('GET', `/calendars/${state.calendarId}/events/${data.event_id}`, {
+      token: state.apiKey,
+    });
+    assert.equal(evt.all_day, true);
+    assert.equal(evt.start, '2099-08-01');
+    // End should be inclusive: iCal DTEND 20990802 means exclusive, so inclusive = 2099-08-01
+    assert.equal(evt.end, '2099-08-01');
+
+    // Clean up
+    await api('DELETE', `/calendars/${state.calendarId}/events/${data.event_id}`, { token: state.apiKey });
+  });
+
+  // Clean up the holiday event
+  after(async () => {
+    if (allDayEvtId) {
+      await api('DELETE', `/calendars/${state.calendarId}/events/${allDayEvtId}`, { token: state.apiKey });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 24. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

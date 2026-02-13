@@ -305,12 +305,40 @@ async function processInboundEmail(calendar, body, res) {
 
   // 4. Extract event data
   const title = extractString(vevent.summary) || payload.subject || 'Untitled';
-  const start = vevent.start ? new Date(vevent.start).toISOString() : null;
-  const end = vevent.end
-    ? new Date(vevent.end).toISOString()
-    : start
-      ? new Date(new Date(start).getTime() + 3600000).toISOString()
-      : null;
+
+  // Detect all-day events: node-ical sets dateOnly to true for VALUE=DATE
+  const allDay = !!(vevent.start && vevent.start.dateOnly);
+
+  let start, end;
+  if (allDay) {
+    // All-day: node-ical may apply timezone offsets to date-only values.
+    // Extract the year/month/day components and reconstruct at midnight UTC.
+    const sd = new Date(vevent.start);
+    // Use the UTC date components from the original date value.
+    // node-ical for VALUE=DATE typically gives us the date at some TZ offset,
+    // so we take the date part from the ISO string which may be shifted.
+    // Safer: use the full year/month/day from the parsed date directly.
+    const startDate = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}-${String(sd.getDate()).padStart(2, '0')}`;
+    start = `${startDate}T00:00:00.000Z`;
+    if (vevent.end) {
+      // iCal all-day DTEND is already exclusive, so use as-is
+      const ed = new Date(vevent.end);
+      const endDate = `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, '0')}-${String(ed.getDate()).padStart(2, '0')}`;
+      end = `${endDate}T00:00:00.000Z`;
+    } else {
+      // Default: 1-day event (end = start + 1 day)
+      const d = new Date(start);
+      d.setUTCDate(d.getUTCDate() + 1);
+      end = d.toISOString().slice(0, 10) + 'T00:00:00.000Z';
+    }
+  } else {
+    start = vevent.start ? new Date(vevent.start).toISOString() : null;
+    end = vevent.end
+      ? new Date(vevent.end).toISOString()
+      : start
+        ? new Date(new Date(start).getTime() + 3600000).toISOString()
+        : null;
+  }
 
   if (!start) {
     return res.json({ status: 'ignored', reason: 'VEVENT missing start time' });
@@ -379,8 +407,8 @@ async function processInboundEmail(calendar, body, res) {
                title = $1, start_time = $2, end_time = $3,
                location = $4, description = $5, attendees = $6,
                organiser_email = $7, recurrence = $8, status = 'recurring',
-               updated_at = now()
-             WHERE id = $9`,
+               all_day = $9, updated_at = now()
+             WHERE id = $10`,
             [
               title,
               start,
@@ -390,6 +418,7 @@ async function processInboundEmail(calendar, body, res) {
               attendees ? JSON.stringify(attendees) : null,
               organiserEmail,
               recurrence,
+              !!allDay,
               evt.id,
             ]
           );
@@ -414,8 +443,9 @@ async function processInboundEmail(calendar, body, res) {
           `UPDATE events SET
              title = $1, start_time = $2, end_time = $3,
              location = $4, description = $5, attendees = $6,
-             organiser_email = $7, status = $8, updated_at = now()
-           WHERE id = $9`,
+             organiser_email = $7, status = $8, all_day = $9,
+             updated_at = now()
+           WHERE id = $10`,
           [
             title,
             start,
@@ -425,6 +455,7 @@ async function processInboundEmail(calendar, body, res) {
             attendees ? JSON.stringify(attendees) : null,
             organiserEmail,
             newStatus,
+            !!allDay,
             evt.id,
           ]
         );
@@ -450,8 +481,8 @@ async function processInboundEmail(calendar, body, res) {
         const { rows } = await pool.query(
           `INSERT INTO events
              (id, calendar_id, title, start_time, end_time, location, description,
-              status, source, organiser_email, ical_uid, attendees, recurrence)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'recurring', 'inbound_email', $8, $9, $10, $11)
+              status, source, organiser_email, ical_uid, attendees, recurrence, all_day)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'recurring', 'inbound_email', $8, $9, $10, $11, $12)
            RETURNING *`,
           [
             id,
@@ -465,6 +496,7 @@ async function processInboundEmail(calendar, body, res) {
             uid,
             attendees ? JSON.stringify(attendees) : null,
             recurrence,
+            !!allDay,
           ]
         );
 
@@ -485,8 +517,8 @@ async function processInboundEmail(calendar, body, res) {
     await pool.query(
       `INSERT INTO events
          (id, calendar_id, title, start_time, end_time, location, description,
-          status, source, organiser_email, ical_uid, attendees)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'tentative', 'inbound_email', $8, $9, $10)`,
+          status, source, organiser_email, ical_uid, attendees, all_day)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'tentative', 'inbound_email', $8, $9, $10, $11)`,
       [
         id,
         calendar.id,
@@ -498,6 +530,7 @@ async function processInboundEmail(calendar, body, res) {
         organiserEmail,
         uid,
         attendees ? JSON.stringify(attendees) : null,
+        !!allDay,
       ]
     );
 

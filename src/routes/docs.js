@@ -234,8 +234,9 @@ router.get('/', (req, res) => {
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">title <span class="param-req">required</span></span><span class="param-desc">Event title/summary</span></div>
-        <div class="param"><span class="param-name">start <span class="param-req">required</span></span><span class="param-desc">ISO 8601 datetime with timezone</span></div>
-        <div class="param"><span class="param-name">end <span class="param-req">required</span></span><span class="param-desc">ISO 8601 datetime with timezone</span></div>
+        <div class="param"><span class="param-name">start <span class="param-req">required</span></span><span class="param-desc">ISO 8601 datetime, or YYYY-MM-DD for all-day events</span></div>
+        <div class="param"><span class="param-name">end <span class="param-req">required</span></span><span class="param-desc">ISO 8601 datetime, or YYYY-MM-DD for all-day events (inclusive)</span></div>
+        <div class="param"><span class="param-name">all_day <span class="param-opt">optional</span></span><span class="param-desc">Boolean. When true, start/end must be YYYY-MM-DD and end is inclusive.</span></div>
         <div class="param"><span class="param-name">description <span class="param-opt">optional</span></span><span class="param-desc">Free text (max 64KB)</span></div>
         <div class="param"><span class="param-name">metadata <span class="param-opt">optional</span></span><span class="param-desc">Structured JSON payload (max 16KB)</span></div>
         <div class="param"><span class="param-name">location <span class="param-opt">optional</span></span><span class="param-desc">Free text or URL</span></div>
@@ -264,6 +265,17 @@ router.get('/', (req, res) => {
     "metadata": {"action": "send_email", "prompt": "Send weather forecast"},
     "recurrence": "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR"
   }'</code></pre>
+      <div class="label">Example — all-day event</div>
+      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -d '{
+    "title": "Company Holiday",
+    "start": "2025-12-25",
+    "end": "2025-12-25",
+    "all_day": true
+  }'</code></pre>
+      <div class="note">All-day events use date-only strings (YYYY-MM-DD). The end date is inclusive, so start and end on the same date means a single day.</div>
       <div class="note">Recurring events are expanded into individual instances for the next 90 days. The response includes <code class="inline-code">instances_created</code> count.</div>
     </div>
 
@@ -309,8 +321,9 @@ router.get('/', (req, res) => {
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">title</span><span class="param-desc">Event title</span></div>
-        <div class="param"><span class="param-name">start</span><span class="param-desc">New start time</span></div>
-        <div class="param"><span class="param-name">end</span><span class="param-desc">New end time</span></div>
+        <div class="param"><span class="param-name">start</span><span class="param-desc">New start time (YYYY-MM-DD for all-day)</span></div>
+        <div class="param"><span class="param-name">end</span><span class="param-desc">New end time (YYYY-MM-DD for all-day, inclusive)</span></div>
+        <div class="param"><span class="param-name">all_day</span><span class="param-desc">Toggle all-day mode on/off</span></div>
         <div class="param"><span class="param-name">description</span><span class="param-desc">Free text</span></div>
         <div class="param"><span class="param-name">metadata</span><span class="param-desc">JSON payload</span></div>
         <div class="param"><span class="param-name">location</span><span class="param-desc">Location</span></div>
