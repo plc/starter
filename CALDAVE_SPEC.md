@@ -13,7 +13,7 @@ Agents interact with CalDave via a REST API and/or MCP tools. Operators (humans 
 ### Calendar
 A calendar belongs to an agent. Each calendar has:
 - A unique **calendar ID** (e.g. `cal_a1b2c3`)
-- A unique **inbound email address** (e.g. `cal-a1b2c3@caldave.fly.dev`)
+- A unique **inbound email address** (e.g. `cal-a1b2c3@caldave.ai`)
 - An **iCal feed URL** (read-only, for subscribing from Google Calendar etc.)
 - A **timezone** (default, set at creation, modifiable)
 
@@ -54,9 +54,9 @@ This keeps the stack simple (Node.js + Postgres + Docker on Fly.io) while mainta
 
 ### Inbound Email: Webhook-based
 
-Each calendar gets a unique email address under the CalDave domain (e.g. `cal-a1b2c3@caldave.fly.dev`). Inbound email is handled via a webhook provider (Postmark Inbound or SendGrid Inbound Parse):
+Each calendar gets a unique email address under the CalDave domain (e.g. `cal-a1b2c3@caldave.ai`). Inbound email is handled via a webhook provider (Postmark Inbound or SendGrid Inbound Parse):
 
-1. Human sends a Google Calendar invite to `cal-a1b2c3@caldave.fly.dev`
+1. Human sends a Google Calendar invite to `cal-a1b2c3@caldave.ai`
 2. Email provider receives it, forwards to CalDave webhook endpoint
 3. CalDave parses the `.ics` attachment, creates an event with `source: inbound_email` and `status: tentative`
 4. Agent can then accept/decline via the API
@@ -119,11 +119,11 @@ Create a new calendar for the authenticated agent.
   "calendar_id": "cal_a1b2c3",
   "name": "Work Schedule",
   "timezone": "America/Denver",
-  "email": "cal-a1b2c3@caldave.fly.dev",
-  "ical_feed_url": "https://caldave.fly.dev/feeds/cal_a1b2c3.ics?token=feed_xyz789",
+  "email": "cal-a1b2c3@caldave.ai",
+  "ical_feed_url": "https://caldave.ai/feeds/cal_a1b2c3.ics?token=feed_xyz789",
   "feed_token": "feed_xyz789",
-  "inbound_webhook_url": "https://caldave.fly.dev/inbound/inb_abc123...",
-  "message": "This calendar can receive invites at cal-a1b2c3@caldave.fly.dev. Forward emails to https://caldave.fly.dev/inbound/inb_abc123.... Save this information."
+  "inbound_webhook_url": "https://caldave.ai/inbound/inb_abc123...",
+  "message": "This calendar can receive invites at cal-a1b2c3@caldave.ai. Forward emails to https://caldave.ai/inbound/inb_abc123.... Save this information."
 }
 ```
 
@@ -272,15 +272,18 @@ For AgentMail, set the `agentmail_api_key` on the calendar via `POST /calendars`
 - `organiser_email` — from the ORGANIZER field in the `.ics`
 - `ical_uid` — from the UID field, used to match updates and cancellations
 
+**Recurring invites:** If the inbound `.ics` contains an RRULE (e.g. a weekly Google Calendar invite), CalDave creates a recurring parent event (`status: 'recurring'`) and materializes instances for 90 days, identical to API-created recurring events. If the RRULE is invalid or generates too many instances, the invite falls back to a single event.
+
 **Response (always 200 to prevent Postmark retries):**
 ```json
 { "status": "created", "event_id": "evt_xxx" }
+{ "status": "created", "event_id": "evt_xxx", "recurrence": "FREQ=WEEKLY;BYDAY=SA", "instances_created": 13 }
 { "status": "updated", "event_id": "evt_xxx" }
 { "status": "cancelled", "event_id": "evt_xxx" }
 { "status": "ignored", "reason": "..." }
 ```
 
-**Reschedule behavior:** If an inbound update changes the event times and the agent had already accepted, the status resets to `tentative` so the agent can re-confirm.
+**Reschedule behavior:** If an inbound update changes the event times and the agent had already accepted, the status resets to `tentative` so the agent can re-confirm. For recurring events, time or RRULE changes trigger rematerialization of all non-exception instances.
 
 ---
 
@@ -375,6 +378,8 @@ MCP auth: The agent's API key is passed as a config parameter when registering t
 
 Recurrence is stored as an RRULE string (RFC 5545). The API expands recurring events into individual occurrences when queried — the `GET /events` and `GET /upcoming` endpoints return expanded instances within the requested time window.
 
+Recurring events can be created via the API (`POST /events` with a `recurrence` field) or from inbound email invites containing an RRULE. In both cases, CalDave creates a parent row (`status: 'recurring'`) and materializes individual instances as separate event rows for the next 90 days.
+
 Single-instance modifications (e.g. "cancel just this Tuesday") are stored as exception events linked to the parent by `ical_uid`.
 
 ---
@@ -411,7 +416,7 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 1. **Agent provisioning auth** — Open, no operator key. Rate-limited (see Rate Limits section).
 2. **Feed authentication** — Token required. Feed URLs include a token param: `/feeds/:calendar_id.ics?token=feed_abc123`. Token is generated at calendar creation and returned in the response.
 3. **Webhook logs** — Failed deliveries are queryable via `GET /calendars/:id/webhook-logs`.
-4. **Domain** — `caldave.fly.dev` for v1. Email addresses: `cal-abc123@caldave.fly.dev`.
+4. **Domain** — `caldave.ai` for v1. Email addresses: `cal-abc123@caldave.ai`.
 5. **Event size limits** — 64KB for description, 16KB for metadata JSON.
 6. **Outbound email** — Not in v1. Agents can accept/decline internally but organisers are not notified. Stubbed for v2.
 7. **Calendar sharing** — Not in v1. Could add via a `calendar_shares` table later.

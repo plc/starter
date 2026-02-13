@@ -13,11 +13,12 @@
 const { Router } = require('express');
 const { pool } = require('../db');
 const { calendarId, feedToken, inboundToken } = require('../lib/ids');
+const { logError } = require('../lib/errors');
 
 const router = Router();
 
 // Domain used for generated email addresses
-const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.fly.dev';
+const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
 
 /**
  * Helper: fetch a calendar and verify the authenticated agent owns it.
@@ -86,7 +87,7 @@ router.post('/', async (req, res) => {
       message: `This calendar can receive invites at ${email}. Forward emails to ${inboundUrl}. Save this information.`,
     });
   } catch (err) {
-    console.error('POST /calendars error:', err.message);
+    await logError(err, { route: 'POST /calendars', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to create calendar' });
   }
 });
@@ -102,7 +103,7 @@ router.get('/', async (req, res) => {
     );
     res.json({ calendars: rows.map(formatCalendar) });
   } catch (err) {
-    console.error('GET /calendars error:', err.message);
+    await logError(err, { route: 'GET /calendars', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to list calendars' });
   }
 });
@@ -116,7 +117,7 @@ router.get('/:id', async (req, res) => {
     if (!cal) return;
     res.json(formatCalendar(cal));
   } catch (err) {
-    console.error('GET /calendars/:id error:', err.message);
+    await logError(err, { route: 'GET /calendars/:id', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to get calendar' });
   }
 });
@@ -155,7 +156,7 @@ router.patch('/:id', async (req, res) => {
 
     res.json(formatCalendar(rows[0]));
   } catch (err) {
-    console.error('PATCH /calendars/:id error:', err.message);
+    await logError(err, { route: 'PATCH /calendars/:id', method: 'PATCH', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to update calendar' });
   }
 });
@@ -171,7 +172,7 @@ router.delete('/:id', async (req, res) => {
     await pool.query('DELETE FROM calendars WHERE id = $1', [req.params.id]);
     res.status(204).end();
   } catch (err) {
-    console.error('DELETE /calendars/:id error:', err.message);
+    await logError(err, { route: 'DELETE /calendars/:id', method: 'DELETE', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to delete calendar' });
   }
 });

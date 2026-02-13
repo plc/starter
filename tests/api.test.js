@@ -490,55 +490,56 @@ describe('iCal feed', { concurrency: 1 }, () => {
 // 13. Inbound email webhook
 // ---------------------------------------------------------------------------
 
+/**
+ * Build a minimal Postmark Inbound payload with a .ics attachment.
+ */
+function postmarkPayload(icsContent, toEmail) {
+  return {
+    From: 'sender@example.com',
+    FromFull: { Email: 'sender@example.com', Name: 'Test Sender' },
+    To: toEmail,
+    ToFull: [{ Email: toEmail, Name: '', MailboxHash: '' }],
+    Subject: 'Calendar Invite',
+    TextBody: 'You have been invited',
+    Attachments: [
+      {
+        Name: 'invite.ics',
+        Content: Buffer.from(icsContent).toString('base64'),
+        ContentType: 'text/calendar',
+        ContentLength: icsContent.length,
+      },
+    ],
+  };
+}
+
+/**
+ * Generate a minimal .ics string for testing.
+ */
+function makeIcs({ method = 'REQUEST', uid, summary, dtstart, dtend, organizer, rrule }) {
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Test//Test//EN',
+    `METHOD:${method}`,
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `SUMMARY:${summary}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    rrule ? `RRULE:${rrule}` : '',
+    organizer ? `ORGANIZER;CN=Organizer:mailto:${organizer}` : '',
+    'ATTENDEE;CN=Agent:mailto:agent@caldave.fly.dev',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+    .filter(Boolean)
+    .join('\r\n');
+}
+
 describe('Inbound email webhook', { concurrency: 1 }, () => {
   let inboundCalId;
   let calendarEmail;
   let inboundEventId;
-
-  /**
-   * Build a minimal Postmark Inbound payload with a .ics attachment.
-   */
-  function postmarkPayload(icsContent, toEmail) {
-    return {
-      From: 'sender@example.com',
-      FromFull: { Email: 'sender@example.com', Name: 'Test Sender' },
-      To: toEmail,
-      ToFull: [{ Email: toEmail, Name: '', MailboxHash: '' }],
-      Subject: 'Calendar Invite',
-      TextBody: 'You have been invited',
-      Attachments: [
-        {
-          Name: 'invite.ics',
-          Content: Buffer.from(icsContent).toString('base64'),
-          ContentType: 'text/calendar',
-          ContentLength: icsContent.length,
-        },
-      ],
-    };
-  }
-
-  /**
-   * Generate a minimal .ics string for testing.
-   */
-  function makeIcs({ method = 'REQUEST', uid, summary, dtstart, dtend, organizer }) {
-    return [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Test//Test//EN',
-      `METHOD:${method}`,
-      'BEGIN:VEVENT',
-      `UID:${uid}`,
-      `SUMMARY:${summary}`,
-      `DTSTART:${dtstart}`,
-      `DTEND:${dtend}`,
-      organizer ? `ORGANIZER;CN=Organizer:mailto:${organizer}` : '',
-      'ATTENDEE;CN=Agent:mailto:agent@caldave.fly.dev',
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ]
-      .filter(Boolean)
-      .join('\r\n');
-  }
 
   before(async () => {
     const { data: cal } = await api('POST', '/calendars', {
@@ -558,7 +559,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
       organizer: 'boss@example.com',
     });
 
-    const { status, data } = await api('POST', '/inbound/email', {
+    const { status, data } = await api('POST', '/inbound', {
       body: postmarkPayload(ics, calendarEmail),
     });
 
@@ -591,7 +592,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
       organizer: 'boss@example.com',
     });
 
-    const { status, data } = await api('POST', '/inbound/email', {
+    const { status, data } = await api('POST', '/inbound', {
       body: postmarkPayload(ics, calendarEmail),
     });
 
@@ -620,7 +621,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
       organizer: 'boss@example.com',
     });
 
-    const { status, data } = await api('POST', '/inbound/email', {
+    const { status, data } = await api('POST', '/inbound', {
       body: postmarkPayload(ics, calendarEmail),
     });
 
@@ -645,7 +646,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
       dtend: '20990601T160000Z',
     });
 
-    const { status, data } = await api('POST', '/inbound/email', {
+    const { status, data } = await api('POST', '/inbound', {
       body: postmarkPayload(ics, 'nobody@caldave.fly.dev'),
     });
 
@@ -654,7 +655,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
   });
 
   it('payload without .ics returns ignored', async () => {
-    const { status, data } = await api('POST', '/inbound/email', {
+    const { status, data } = await api('POST', '/inbound', {
       body: {
         From: 'sender@example.com',
         To: calendarEmail,
@@ -679,7 +680,7 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
       organizer: 'someone@example.com',
     });
 
-    await api('POST', '/inbound/email', {
+    await api('POST', '/inbound', {
       body: postmarkPayload(ics, calendarEmail),
     });
 
@@ -708,7 +709,210 @@ describe('Inbound email webhook', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 14. Cleanup
+// 14. Inbound email — per-calendar token route
+// ---------------------------------------------------------------------------
+
+describe('Inbound email — per-calendar token', { concurrency: 1 }, () => {
+  let tokenCalId;
+  let inboundToken;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Token Inbound Cal' },
+    });
+    tokenCalId = cal.calendar_id;
+    // Extract token from webhook URL (https://domain/inbound/<token>)
+    inboundToken = cal.inbound_webhook_url.split('/inbound/')[1];
+  });
+
+  it('creates event via per-calendar token route', async () => {
+    const ics = makeIcs({
+      uid: 'token-route-test@example.com',
+      summary: 'Token Route Event',
+      dtstart: '20990801T100000Z',
+      dtend: '20990801T110000Z',
+      organizer: 'organizer@example.com',
+    });
+
+    const { status, data } = await api('POST', `/inbound/${inboundToken}`, {
+      body: postmarkPayload(ics, 'anything@example.com'),
+    });
+
+    assert.equal(status, 200);
+    assert.equal(data.status, 'created');
+    assert.ok(data.event_id);
+  });
+
+  it('invalid token returns 404', async () => {
+    const ics = makeIcs({
+      uid: 'bad-token@example.com',
+      summary: 'Test',
+      dtstart: '20990801T100000Z',
+      dtend: '20990801T110000Z',
+    });
+
+    const { status } = await api('POST', '/inbound/invalid_token_xyz', {
+      body: postmarkPayload(ics, 'anything@example.com'),
+    });
+
+    assert.equal(status, 404);
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${tokenCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. Inbound email — recurring invites
+// ---------------------------------------------------------------------------
+
+describe('Inbound email — recurring invites', { concurrency: 1 }, () => {
+  let recurCalId;
+  let recurCalEmail;
+  let recurEventId;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Recurring Inbound Cal' },
+    });
+    recurCalId = cal.calendar_id;
+    recurCalEmail = cal.email;
+  });
+
+  it('creates recurring event from .ics with RRULE', async () => {
+    // Use near-future dates so instances fall within 90-day materialize window
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000); // tomorrow
+    const end = new Date(start.getTime() + 30 * 60 * 1000); // +30 min
+    const dtstart = start.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+    const dtend = end.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+
+    const ics = makeIcs({
+      uid: 'recurring-inbound@example.com',
+      summary: 'Weekly Standup',
+      dtstart,
+      dtend,
+      organizer: 'manager@example.com',
+      rrule: 'FREQ=WEEKLY',
+    });
+
+    const { status, data } = await api('POST', '/inbound', {
+      body: postmarkPayload(ics, recurCalEmail),
+    });
+
+    assert.equal(status, 200);
+    assert.equal(data.status, 'created');
+    assert.ok(data.event_id);
+    assert.equal(data.recurrence, 'FREQ=WEEKLY');
+    assert.ok(data.instances_created > 0, `Expected instances, got ${data.instances_created}`);
+    recurEventId = data.event_id;
+  });
+
+  it('parent event has status=recurring', async () => {
+    const { status, data } = await api('GET', `/calendars/${recurCalId}/events/${recurEventId}`, {
+      token: state.apiKey,
+    });
+    assert.equal(status, 200);
+    assert.equal(data.status, 'recurring');
+    assert.equal(data.source, 'inbound_email');
+    assert.equal(data.recurrence, 'FREQ=WEEKLY');
+  });
+
+  it('materialized instances appear in event list', async () => {
+    const { data } = await api('GET', `/calendars/${recurCalId}/events?limit=200`, {
+      token: state.apiKey,
+    });
+    const instances = data.events.filter(e => e.parent_event_id === recurEventId);
+    assert.ok(instances.length > 0, 'Should have materialized instances');
+    assert.ok(instances.length >= 10, `Expected at least 10 weekly instances, got ${instances.length}`);
+  });
+
+  it('update with new times rematerializes instances', async () => {
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // day after tomorrow
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const dtstart = start.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+    const dtend = end.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+
+    const ics = makeIcs({
+      uid: 'recurring-inbound@example.com',
+      summary: 'Weekly Standup (Moved)',
+      dtstart,
+      dtend,
+      organizer: 'manager@example.com',
+      rrule: 'FREQ=WEEKLY',
+    });
+
+    const { status, data } = await api('POST', '/inbound', {
+      body: postmarkPayload(ics, recurCalEmail),
+    });
+
+    assert.equal(status, 200);
+    assert.equal(data.status, 'updated');
+    assert.equal(data.event_id, recurEventId);
+    assert.ok(data.instances_created > 0, 'Should have rematerialized instances');
+  });
+
+  it('cancel removes recurring event', async () => {
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const dtstart = start.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+    const dtend = end.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+
+    const ics = makeIcs({
+      method: 'CANCEL',
+      uid: 'recurring-inbound@example.com',
+      summary: 'Weekly Standup (Moved)',
+      dtstart,
+      dtend,
+      organizer: 'manager@example.com',
+    });
+
+    const { status, data } = await api('POST', '/inbound', {
+      body: postmarkPayload(ics, recurCalEmail),
+    });
+
+    assert.equal(status, 200);
+    assert.equal(data.status, 'cancelled');
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${recurCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 16. Error log endpoint
+// ---------------------------------------------------------------------------
+
+describe('Error log endpoint', { concurrency: 1 }, () => {
+  it('GET /errors requires auth', async () => {
+    const { status } = await api('GET', '/errors');
+    assert.equal(status, 401);
+  });
+
+  it('GET /errors returns error list', async () => {
+    const { status, data } = await api('GET', '/errors', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(data.errors));
+    assert.ok(typeof data.count === 'number');
+  });
+
+  it('GET /errors supports ?limit parameter', async () => {
+    const { status, data } = await api('GET', '/errors?limit=5', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.ok(data.errors.length <= 5);
+  });
+
+  it('GET /errors/:id returns 404 for non-existent error', async () => {
+    const { status } = await api('GET', '/errors/999999', { token: state.apiKey });
+    assert.equal(status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Daily horizon extension job keeps instances 60-90 days ahead
   - Max 1000 instances per 90-day window guard
   - Uses `rrule` npm package for RRULE parsing and expansion
+- **API documentation page** (`GET /docs`) — self-contained HTML docs with curl examples for every endpoint, copy buttons, quick start guide, and dark theme matching the status page
 - Full API spec in `CALDAVE_SPEC.md`
 - **Inbound email support** — receive calendar invites via per-calendar webhook URLs
   - `POST /inbound/:token` — unique webhook URL per calendar (token in URL authenticates)
@@ -41,6 +42,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **Multi-provider support**: Postmark (inline base64 attachments) and AgentMail (attachment fetch via API)
   - Per-calendar `agentmail_api_key` for AgentMail attachment downloads (set via POST/PATCH /calendars)
   - Fallback: parses iCal data from email text body if no `.ics` attachment found
+  - **Postmark inbound domain support** — `POST /inbound` accepts emails from a Postmark inbound domain server (e.g. `*@invite.caldave.ai`). Parses the `To` address to route to the correct calendar. Shared processing logic with per-calendar `/:token` route.
+  - **Recurring event support for inbound invites** — extracts RRULE from inbound `.ics` VEVENT, creates recurring parent with materialized instances (same as API-created recurring events). Updates rematerialize instances when times/RRULE change. Falls back to single event if RRULE is invalid.
+- **Error logging** — API errors are persisted to an `error_log` PostgreSQL table with route, method, message, stack trace, and agent ID. Queryable via `GET /errors` (auth required, supports `?route=` filter and `?limit=`) and `GET /errors/:id` for full stack traces.
 - Integration test suite (`tests/api.test.js`) using Node.js built-in `node:test` runner
 
 ### Changed

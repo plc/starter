@@ -11,10 +11,11 @@
 const { Router } = require('express');
 const { default: ical } = require('ical-generator');
 const { pool } = require('../db');
+const { logError } = require('../lib/errors');
 
 const router = Router();
 
-const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.fly.dev';
+const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
 
 /**
  * GET /feeds/:calendar_id.ics?token=:feed_token
@@ -87,7 +88,7 @@ router.get('/:calendar_id.ics', async (req, res) => {
     res.set('Content-Disposition', `inline; filename="${calendar_id}.ics"`);
     res.send(calendar.toString());
   } catch (err) {
-    console.error('GET /feeds error:', err.message);
+    await logError(err, { route: 'GET /feeds/:id.ics', method: 'GET' });
     res.status(500).json({ error: 'Failed to generate feed' });
   }
 });

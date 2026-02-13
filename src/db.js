@@ -100,6 +100,21 @@ async function initSchema() {
 
     -- Per-calendar AgentMail API key for fetching attachments
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS agentmail_api_key text;
+
+    -- Error log for tracking API errors
+    CREATE TABLE IF NOT EXISTS error_log (
+      id            serial PRIMARY KEY,
+      route         text,
+      method        text,
+      status_code   integer,
+      message       text NOT NULL,
+      stack         text,
+      agent_id      text,
+      created_at    timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_error_log_created
+      ON error_log (created_at DESC);
   `);
 
   // Backfill inbound_token for existing calendars that don't have one

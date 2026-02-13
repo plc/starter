@@ -10,6 +10,7 @@
 
 const { pool } = require('../db');
 const { hashKey } = require('../lib/keys');
+const { logError } = require('../lib/errors');
 
 async function auth(req, res, next) {
   const header = req.headers.authorization;
@@ -33,7 +34,7 @@ async function auth(req, res, next) {
     req.agent = { id: result.rows[0].id };
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err.message);
+    await logError(err, { route: 'auth middleware', method: req.method });
     res.status(500).json({ error: 'Internal server error' });
   }
 }

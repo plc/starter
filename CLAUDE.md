@@ -22,7 +22,7 @@ Use these credentials to test the API after making changes. The server must be r
 Agent ID:    agt_t305j58pF6dj
 API Key:     $CALDAVE_API_KEY
 Calendar ID: cal_t4IXi3cnVzDL
-Email:       cal-t4IXi3cnVzDL@caldave.fly.dev
+Email:       cal-t4IXi3cnVzDL@caldave.ai
 ```
 
 Quick smoke test:

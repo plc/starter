@@ -12,9 +12,10 @@
  * Environment variables:
  * - PORT: Server port (default: 3000)
  * - DATABASE_URL: PostgreSQL connection string
- * - CALDAVE_DOMAIN: Domain for calendar emails (default: caldave.fly.dev)
+ * - CALDAVE_DOMAIN: Domain for calendar emails (default: caldave.ai)
  */
 
+const path = require('path');
 const express = require('express');
 const { pool, initSchema } = require('./db');
 const auth = require('./middleware/auth');
@@ -24,6 +25,8 @@ const calendarsRouter = require('./routes/calendars');
 const eventsRouter = require('./routes/events');
 const feedsRouter = require('./routes/feeds');
 const inboundRouter = require('./routes/inbound');
+const docsRouter = require('./routes/docs');
+const quickstartRouter = require('./routes/quickstart');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
@@ -71,109 +74,66 @@ app.get('/health/db', async (req, res) => {
   }
 });
 
+// Static logo
+app.get('/logo.png', (req, res) => {
+  res.sendFile(path.join(__dirname, 'logo.png'));
+});
+
 /**
  * GET /
- * Status page — dark-themed HTML dashboard showing server + DB health.
+ * Landing page.
  */
-app.get('/', async (req, res) => {
-  const appName = 'CalDave';
-  const serverTime = new Date().toISOString();
-
-  let dbStatus = { connected: false, time: null, version: null, error: null };
-  try {
-    const result = await pool.query('SELECT NOW() as time, version() as version');
-    dbStatus = {
-      connected: true,
-      time: result.rows[0].time,
-      version: result.rows[0].version.split(' ')[0] + ' ' + result.rows[0].version.split(' ')[1],
-      error: null,
-    };
-  } catch (error) {
-    dbStatus.error = error.message;
-  }
+app.get('/', (req, res) => {
+  const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${appName}</title>
+  <title>CalDave</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .container { max-width: 500px; width: 100%; }
-    h1 { font-size: 2rem; margin-bottom: 1.5rem; color: #fff; }
-    .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
-    .card h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; }
-    .status { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-    .status:last-child { margin-bottom: 0; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .dot.green { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-    .dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
-    .label { color: #94a3b8; min-width: 80px; }
-    .value { color: #fff; word-break: break-all; }
-    .endpoints { margin-top: 1.5rem; }
-    .endpoints a { display: block; color: #60a5fa; text-decoration: none; padding: 0.5rem 0; border-bottom: 1px solid #334155; }
-    .endpoints a:last-child { border-bottom: none; }
-    .endpoints a:hover { color: #93c5fd; }
-    code { background: #334155; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.875rem; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .container { max-width: 540px; width: 100%; }
+    h1 { font-size: 2.5rem; color: #fff; margin-bottom: 0.75rem; }
+    .tagline { font-size: 1.125rem; color: #94a3b8; line-height: 1.6; margin-bottom: 2rem; }
+    .features { list-style: none; margin-bottom: 2rem; }
+    .features li { padding: 0.5rem 0; color: #cbd5e1; font-size: 0.9375rem; display: flex; align-items: baseline; gap: 0.75rem; }
+    .features li::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; flex-shrink: 0; position: relative; top: -1px; }
+    .links { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .links a { display: inline-block; padding: 0.625rem 1.25rem; border-radius: 8px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.15s; }
+    .links .primary { background: #2563eb; color: #fff; }
+    .links .primary:hover { background: #3b82f6; }
+    .links .secondary { background: #1e293b; color: #94a3b8; }
+    .links .secondary:hover { background: #334155; color: #e2e8f0; }
+    pre { background: #1e293b; border-radius: 8px; padding: 1rem; overflow-x: auto; margin-bottom: 2rem; }
+    code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8125rem; color: #e2e8f0; }
+    .dim { color: #64748b; }
+    .logo { width: 80px; height: 80px; margin-bottom: 1rem; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>${appName}</h1>
+    <img src="/logo.png" alt="CalDave" class="logo">
+    <h1>CalDave</h1>
+    <p class="tagline">A calendar API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.</p>
 
-    <div class="card">
-      <h2>Server</h2>
-      <div class="status">
-        <span class="dot green"></span>
-        <span class="label">Status</span>
-        <span class="value">Running</span>
-      </div>
-      <div class="status">
-        <span class="dot green"></span>
-        <span class="label">Time</span>
-        <span class="value">${serverTime}</span>
-      </div>
-    </div>
+    <ul class="features">
+      <li>REST API with Bearer token auth</li>
+      <li>Per-calendar email addresses for receiving invites</li>
+      <li>iCal feeds compatible with Google Calendar and Apple Calendar</li>
+      <li>Recurring events with RRULE support</li>
+      <li>Polling endpoint for agent scheduling</li>
+      <li>Inbound email via Postmark or AgentMail</li>
+    </ul>
 
-    <div class="card">
-      <h2>Database</h2>
-      <div class="status">
-        <span class="dot ${dbStatus.connected ? 'green' : 'red'}"></span>
-        <span class="label">Status</span>
-        <span class="value">${dbStatus.connected ? 'Connected' : 'Disconnected'}</span>
-      </div>
-      ${dbStatus.connected ? `
-      <div class="status">
-        <span class="dot green"></span>
-        <span class="label">Version</span>
-        <span class="value">${dbStatus.version}</span>
-      </div>
-      <div class="status">
-        <span class="dot green"></span>
-        <span class="label">Time</span>
-        <span class="value">${dbStatus.time}</span>
-      </div>
-      ` : `
-      <div class="status">
-        <span class="dot red"></span>
-        <span class="label">Error</span>
-        <span class="value">${dbStatus.error}</span>
-      </div>
-      `}
-    </div>
+    <pre><code><span class="dim"># Get started in seconds</span>
+curl -X POST https://${DOMAIN}/agents</code></pre>
 
-    <div class="card endpoints">
-      <h2>API Endpoints</h2>
-      <a href="/health"><code>GET /health</code> — Server health check</a>
-      <a href="/health/db"><code>GET /health/db</code> — Database health check</a>
-      <a><code>POST /agents</code> — Create agent (get API key)</a>
-      <a><code>POST /calendars</code> — Create calendar</a>
-      <a><code>GET /calendars</code> — List calendars</a>
-      <a><code>GET /calendars/:id/upcoming</code> — Upcoming events</a>
-      <a><code>GET /feeds/:id.ics</code> — iCal feed (token auth)</a>
-      <a><code>POST /inbound/:token</code> — Inbound email webhook (per-calendar)</a>
+    <div class="links">
+      <a href="/quickstart" class="primary">Quick Start</a>
+      <a href="/docs" class="secondary">API Docs</a>
     </div>
   </div>
 </body>
@@ -181,6 +141,10 @@ app.get('/', async (req, res) => {
 
   res.send(html);
 });
+
+// API documentation and quick start (no auth)
+app.use('/docs', docsRouter);
+app.use('/quickstart', quickstartRouter);
 
 // Agent provisioning (no auth)
 app.use('/agents', agentsRouter);
@@ -199,12 +163,68 @@ app.use('/calendars', auth, calendarsRouter);
 // Event routes are nested under /calendars/:id but handled by eventsRouter
 app.use('/calendars', auth, eventsRouter);
 
+/**
+ * GET /errors
+ * Query recent errors from the error_log table. Auth required.
+ * Query params: limit (default 50), route (filter by route pattern)
+ */
+app.get('/errors', auth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const conditions = [];
+    const values = [];
+    let idx = 1;
+
+    if (req.query.route) {
+      conditions.push(`route ILIKE $${idx++}`);
+      values.push(`%${req.query.route}%`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    values.push(limit);
+
+    const { rows } = await pool.query(
+      `SELECT id, route, method, status_code, message, agent_id, created_at
+       FROM error_log ${where}
+       ORDER BY created_at DESC
+       LIMIT $${idx}`,
+      values
+    );
+
+    res.json({ errors: rows, count: rows.length });
+  } catch (err) {
+    console.error('GET /errors error:', err.message);
+    res.status(500).json({ error: 'Failed to query error log' });
+  }
+});
+
+/**
+ * GET /errors/:id
+ * Get a single error with full stack trace.
+ */
+app.get('/errors/:id', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM error_log WHERE id = $1',
+      [req.params.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Error not found' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('GET /errors/:id error:', err.message);
+    res.status(500).json({ error: 'Failed to query error log' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Error handling
 // ---------------------------------------------------------------------------
 
-app.use((err, req, res, _next) => {
-  console.error('Unhandled error:', err);
+app.use(async (err, req, res, _next) => {
+  const { logError } = require('./lib/errors');
+  await logError(err, { route: `${req.method} ${req.path}`, method: req.method, agent_id: req.agent?.id });
   res.status(500).json({ error: 'Internal server error' });
 });
 

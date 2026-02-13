@@ -131,7 +131,7 @@ See [CALDAVE_SPEC.md](CALDAVE_SPEC.md) for full request/response examples.
 | `PORT` | `3000` | Server port (CalDave uses 3720 via `get-port.sh`) |
 | `DATABASE_URL` | `postgres://plc:postgres@host.docker.internal:5432/caldave` | PostgreSQL connection string |
 | `DB_NAME` | `caldave` | Database name (used by init script) |
-| `CALDAVE_DOMAIN` | `caldave.fly.dev` | Domain for generated calendar email addresses |
+| `CALDAVE_DOMAIN` | `caldave.ai` | Domain for generated calendar email addresses |
 
 ## Local Development
 

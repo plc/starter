@@ -87,6 +87,7 @@ Events can include a `recurrence` field (RFC 5545 RRULE string, e.g. `FREQ=DAILY
 - Individual instances can be modified (become exceptions) or cancelled
 - DELETE supports `?mode=single|future|all` for recurring events
 - Max 1000 instances per 90-day window (rejects very high-frequency rules)
+- Inbound email invites with RRULE are created as recurring events (same materialization as API-created)
 
 ## Environment Variables
 
@@ -95,7 +96,7 @@ Events can include a `recurrence` field (RFC 5545 RRULE string, e.g. `FREQ=DAILY
 | `PORT` | `3000` | Server port (CalDave uses 3720) |
 | `DATABASE_URL` | — | Postgres connection string |
 | `DB_NAME` | `caldave` | Database name for init script |
-| `CALDAVE_DOMAIN` | `caldave.fly.dev` | Domain for calendar email addresses |
+| `CALDAVE_DOMAIN` | `caldave.ai` | Domain for calendar email addresses |
 
 ## Auth Model
 

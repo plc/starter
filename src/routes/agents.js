@@ -11,6 +11,7 @@ const { Router } = require('express');
 const { pool } = require('../db');
 const { agentId, apiKey } = require('../lib/ids');
 const { hashKey } = require('../lib/keys');
+const { logError } = require('../lib/errors');
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.post('/', async (req, res) => {
       message: 'Store these credentials securely. The API key will not be shown again.',
     });
   } catch (err) {
-    console.error('POST /agents error:', err.message);
+    await logError(err, { route: 'POST /agents', method: 'POST' });
     res.status(500).json({ error: 'Failed to create agent' });
   }
 });

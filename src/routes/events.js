@@ -15,6 +15,7 @@
 const { Router } = require('express');
 const { pool } = require('../db');
 const { eventId } = require('../lib/ids');
+const { logError } = require('../lib/errors');
 const {
   parseAndValidateRRule,
   materializeInstances,
@@ -179,7 +180,7 @@ router.post('/:id/events', async (req, res) => {
 
     res.status(201).json(formatEvent(rows[0]));
   } catch (err) {
-    console.error('POST /events error:', err.message);
+    await logError(err, { route: 'POST /calendars/:id/events', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to create event' });
   }
 });
@@ -225,7 +226,7 @@ router.get('/:id/events', async (req, res) => {
 
     res.json({ events: rows.map(formatEvent) });
   } catch (err) {
-    console.error('GET /events error:', err.message);
+    await logError(err, { route: 'GET /calendars/:id/events', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to list events' });
   }
 });
@@ -261,7 +262,7 @@ router.get('/:id/upcoming', async (req, res) => {
 
     res.json({ events, next_event_starts_in: nextEventStartsIn });
   } catch (err) {
-    console.error('GET /upcoming error:', err.message);
+    await logError(err, { route: 'GET /calendars/:id/upcoming', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to get upcoming events' });
   }
 });
@@ -284,7 +285,7 @@ router.get('/:id/events/:event_id', async (req, res) => {
 
     res.json(formatEvent(rows[0]));
   } catch (err) {
-    console.error('GET /events/:id error:', err.message);
+    await logError(err, { route: 'GET /calendars/:id/events/:event_id', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to get event' });
   }
 });
@@ -461,7 +462,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
 
     res.json(formatEvent(rows[0]));
   } catch (err) {
-    console.error('PATCH /events/:id error:', err.message);
+    await logError(err, { route: 'PATCH /calendars/:id/events/:event_id', method: 'PATCH', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to update event' });
   }
 });
@@ -572,7 +573,7 @@ router.delete('/:id/events/:event_id', async (req, res) => {
       return res.status(400).json({ error: 'mode must be one of: single, future, all' });
     }
   } catch (err) {
-    console.error('DELETE /events/:id error:', err.message);
+    await logError(err, { route: 'DELETE /calendars/:id/events/:event_id', method: 'DELETE', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to delete event' });
   }
 });
@@ -618,7 +619,7 @@ router.post('/:id/events/:event_id/respond', async (req, res) => {
       message: `Event ${response}`,
     });
   } catch (err) {
-    console.error('POST /respond error:', err.message);
+    await logError(err, { route: 'POST /calendars/:id/events/:event_id/respond', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to respond to event' });
   }
 });
