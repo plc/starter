@@ -32,7 +32,7 @@ A calendar entry. Events have:
 - `location` — optional, free text or URL
 - `status` — `confirmed` | `tentative` | `cancelled`
 - `source` — `api` | `inbound_email` — how the event was created
-- `recurrence` — optional RRULE string (RFC 5545)
+- `recurrence` — optional RRULE string (RFC 5545). Alias: `rrule`
 - `attendees` — optional list of email addresses
 - `reminders` — optional list of reminder offsets (e.g. `["-15m", "-1h"]`)
 

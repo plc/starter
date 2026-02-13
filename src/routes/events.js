@@ -36,13 +36,14 @@ const MAX_METADATA = 16 * 1024;    // 16KB
  */
 async function verifyCalendarOwnership(req, res) {
   const { rows } = await pool.query(
-    'SELECT id FROM calendars WHERE id = $1 AND agent_id = $2',
+    'SELECT id, timezone FROM calendars WHERE id = $1 AND agent_id = $2',
     [req.params.id, req.agent.id]
   );
   if (rows.length === 0) {
     res.status(404).json({ error: 'Calendar not found' });
     return false;
   }
+  req.calendarTimezone = rows[0].timezone || null;
   return true;
 }
 
@@ -110,8 +111,19 @@ function msToIsoDuration(ms) {
  */
 const KNOWN_EVENT_FIELDS = new Set([
   'title', 'start', 'end', 'description', 'metadata', 'location',
-  'status', 'attendees', 'recurrence', 'all_day',
+  'status', 'attendees', 'recurrence', 'rrule', 'all_day',
 ]);
+
+/**
+ * Normalize body: accept `rrule` as an alias for `recurrence`.
+ * If both are present, `recurrence` takes precedence.
+ */
+function normalizeBody(body) {
+  if (body.rrule !== undefined && body.recurrence === undefined) {
+    body.recurrence = body.rrule;
+  }
+  delete body.rrule;
+}
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -144,6 +156,7 @@ router.post('/:id/events', async (req, res) => {
   try {
     if (!(await verifyCalendarOwnership(req, res))) return;
 
+    normalizeBody(req.body);
     const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
@@ -293,7 +306,9 @@ router.get('/:id/events', async (req, res) => {
       values
     );
 
-    res.json({ events: rows.map(formatEvent) });
+    const result = { events: rows.map(formatEvent) };
+    if (req.calendarTimezone) result.timezone = req.calendarTimezone;
+    res.json(result);
   } catch (err) {
     await logError(err, { route: 'GET /calendars/:id/events', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to list events' });
@@ -329,7 +344,9 @@ router.get('/:id/upcoming', async (req, res) => {
       nextEventStartsIn = msToIsoDuration(Math.max(0, msUntil));
     }
 
-    res.json({ events, next_event_starts_in: nextEventStartsIn });
+    const result = { events, next_event_starts_in: nextEventStartsIn };
+    if (req.calendarTimezone) result.timezone = req.calendarTimezone;
+    res.json(result);
   } catch (err) {
     await logError(err, { route: 'GET /calendars/:id/upcoming', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to get upcoming events' });
@@ -382,6 +399,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
 
     const evt = check.rows[0];
 
+    normalizeBody(req.body);
     const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 

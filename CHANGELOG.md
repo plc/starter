@@ -10,8 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **All-day events** — events can now be created with `all_day: true` and date-only `start`/`end` in `YYYY-MM-DD` format. End date is inclusive (e.g. `start: "2025-03-15", end: "2025-03-15"` = one-day event). Supported across the full stack: API CRUD, recurring events, inbound email detection (VALUE=DATE), iCal feeds (DTSTART;VALUE=DATE), plain text view, MCP tools, and documentation.
 - **`caldave-mcp` npm package** — standalone MCP server published as `caldave-mcp` on npm. Run with `npx caldave-mcp` with `CALDAVE_API_KEY` set.
 
+### Changed
+- **`rrule` accepted as alias for `recurrence`** — POST/PATCH event endpoints now accept either `rrule` or `recurrence` for the recurrence rule field. `rrule` is the RFC 5545 term and more intuitive for most users.
+- **Timezone in event list responses** — `GET /events` and `GET /upcoming` now include a `timezone` field in the response envelope when the calendar has a timezone set, making it easier for agents to convert UTC times.
+- **Quickstart links to API docs** — the Quick Start page now prominently links to the full API reference to help users find field names and parameters.
+
 ### Fixed
-- **Unknown field rejection** — POST/PATCH endpoints for events and calendars now return 400 with a list of unknown fields instead of silently ignoring them (e.g. sending `rrule` instead of `recurrence` now errors)
+- **Unknown field rejection** — POST/PATCH endpoints for events and calendars now return 400 with a list of unknown fields instead of silently ignoring them
 - **Inbound REQUEST after CANCEL** — when an organiser moves or re-sends an invite that was previously cancelled, the event is now un-cancelled (recurring events reset to `recurring` with rematerialized instances; non-recurring events reset to `tentative`)
 - **Calendar email domain** — calendar emails now correctly use `@invite.caldave.ai` (Postmark inbound domain) instead of `@caldave.ai`
 - **MCP server instructions** — the MCP server now sends a detailed `instructions` string during initialization, giving AI agents full context about CalDave's workflow, inbound email, recurring events, metadata, and tool usage guidance

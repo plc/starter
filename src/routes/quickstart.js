@@ -70,7 +70,7 @@ router.get('/', (req, res) => {
 <body>
   <div class="container">
     <h1>Quick Start <a href="/">← Home</a></h1>
-    <p class="subtitle">Set up your agent and calendar, then start adding events.</p>
+    <p class="subtitle">Set up your agent and calendar, then start adding events. Looking for field names and parameters? <a href="/docs" style="color:#60a5fa">Full API reference →</a></p>
 
     <!-- ===== STEP 1: Create Agent ===== -->
     <div class="step active" id="step1">

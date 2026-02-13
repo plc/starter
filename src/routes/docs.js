@@ -242,7 +242,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">location <span class="param-opt">optional</span></span><span class="param-desc">Free text or URL</span></div>
         <div class="param"><span class="param-name">status <span class="param-opt">optional</span></span><span class="param-desc">confirmed (default), tentative, cancelled</span></div>
         <div class="param"><span class="param-name">attendees <span class="param-opt">optional</span></span><span class="param-desc">Array of email addresses</span></div>
-        <div class="param"><span class="param-name">recurrence <span class="param-opt">optional</span></span><span class="param-desc">RFC 5545 RRULE string (e.g. FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR)</span></div>
+        <div class="param"><span class="param-name">recurrence <span class="param-opt">optional</span></span><span class="param-desc">RFC 5545 RRULE string (e.g. FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR). Alias: <code class="inline-code">rrule</code></span></div>
       </div>
       <div class="label">Example — one-off event</div>
       <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
@@ -329,7 +329,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">location</span><span class="param-desc">Location</span></div>
         <div class="param"><span class="param-name">status</span><span class="param-desc">confirmed, tentative, cancelled</span></div>
         <div class="param"><span class="param-name">attendees</span><span class="param-desc">Array of email addresses</span></div>
-        <div class="param"><span class="param-name">recurrence</span><span class="param-desc">Updated RRULE (parent only — triggers rematerialization)</span></div>
+        <div class="param"><span class="param-name">recurrence</span><span class="param-desc">Updated RRULE (parent only — triggers rematerialization). Alias: <code class="inline-code">rrule</code></span></div>
       </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID/events/evt_abc123 \\
