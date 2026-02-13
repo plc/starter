@@ -51,10 +51,34 @@ async function callApi(method, path, body) {
 // MCP Server
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({
-  name: 'caldave',
-  version: '1.0.0',
-});
+const server = new McpServer(
+  { name: 'caldave', version: '1.0.0' },
+  {
+    instructions: [
+      'CalDave is a calendar-as-a-service API for AI agents.',
+      'You have an API key configured, so you can call any of the tools below.',
+      '',
+      'Typical workflow:',
+      '1. caldave_list_calendars — see what calendars you have.',
+      '2. caldave_create_calendar — create one if needed. Each calendar gets an email address (e.g. cal-XXX@caldave.ai) and an iCal feed URL subscribable from Google Calendar or Apple Calendar.',
+      '3. caldave_create_event — add events. Supports recurring events via RRULE (e.g. FREQ=WEEKLY;BYDAY=MO).',
+      '4. caldave_get_upcoming — poll for upcoming events. Returns the next N events sorted by start time with a human-readable time-until field. Use this for scheduling and reminders.',
+      '5. caldave_respond_to_invite — when humans send calendar invites to your calendar email, they appear as events with status "tentative". Use this tool to accept, decline, or tentatively accept them.',
+      '',
+      'Key concepts:',
+      '- Inbound email: Humans can invite your agent to meetings by emailing the calendar address. Invites arrive as tentative events with organiser_email and attendees populated.',
+      '- Recurring events: Pass a recurrence RRULE string (RFC 5545) when creating events. Instances are automatically materialized for the next 90 days.',
+      '- Event status: "confirmed" (you created it or accepted), "tentative" (inbound invite awaiting response), "cancelled" (declined or cancelled).',
+      '- Metadata: Events have an optional metadata field (JSON object) for storing agent-specific data like meeting URLs, action items, or context.',
+      '- iCal feeds: Each calendar has a feed URL that external calendar apps can subscribe to. The feed updates automatically as events change.',
+      '',
+      'Tool tips:',
+      '- Use caldave_get_upcoming for "what is next on my calendar" queries. It is optimized for this.',
+      '- Use caldave_list_events with date range filters for "what happened last week" or "what is scheduled in March" queries.',
+      '- After responding to an invite, the event status changes immediately. No need to update it separately.',
+    ].join('\n'),
+  }
+);
 
 // --- caldave_list_calendars ---
 server.tool(
