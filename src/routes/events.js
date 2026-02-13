@@ -106,6 +106,10 @@ router.post('/:id/events', async (req, res) => {
     if (!start) return res.status(400).json({ error: 'start is required' });
     if (!end) return res.status(400).json({ error: 'end is required' });
 
+    // Length checks
+    if (title.length > 500) return res.status(400).json({ error: 'title exceeds 500 character limit' });
+    if (location && location.length > 500) return res.status(400).json({ error: 'location exceeds 500 character limit' });
+
     // Size checks
     if (description && Buffer.byteLength(description) > MAX_DESCRIPTION) {
       return res.status(400).json({ error: 'description exceeds 64KB limit' });
@@ -313,6 +317,14 @@ router.patch('/:id/events/:event_id', async (req, res) => {
 
     const evt = check.rows[0];
     const { title, description, metadata, start, end, location, status, attendees, recurrence } = req.body;
+
+    // Length checks
+    if (title !== undefined && title.length > 500) {
+      return res.status(400).json({ error: 'title exceeds 500 character limit' });
+    }
+    if (location !== undefined && location.length > 500) {
+      return res.status(400).json({ error: 'location exceeds 500 character limit' });
+    }
 
     // Size checks
     if (description && Buffer.byteLength(description) > MAX_DESCRIPTION) {

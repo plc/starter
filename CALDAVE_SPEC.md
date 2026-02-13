@@ -187,6 +187,25 @@ Convenience endpoint. Returns the next N events (default 5) from now. Designed f
 }
 ```
 
+#### `GET /calendars/:id/view`
+Plain text table of upcoming events. Useful for quick inspection via curl.
+
+**Query params:** `limit` (default 10, max 50)
+
+**Example:**
+```
+curl -s http://127.0.0.1:3720/calendars/cal_xxx/view \
+  -H "Authorization: Bearer sk_live_xxx"
+
+Work (cal_xxx)  tz: America/Denver
+----------------------------------------
+TITLE          START                 ...
+----------------------------------------
+Daily standup  2026-02-13 16:00:00Z  ...
+----------------------------------------
+1 event(s)
+```
+
 #### `POST /calendars/:id/events/:event_id/respond`
 Accept or decline an inbound invite.
 
@@ -302,7 +321,45 @@ For agents using MCP, CalDave exposes these tools:
 | `caldave_respond_to_invite` | Accept/decline an inbound invite. |
 | `caldave_list_events` | List events with optional date range and status filters. |
 
-MCP auth: The agent's API key is passed as a config parameter when registering the MCP server.
+### Configuration
+
+The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP client:
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "caldave": {
+      "command": "node",
+      "args": ["/path/to/caldave/src/mcp.mjs"],
+      "env": {
+        "CALDAVE_API_KEY": "sk_live_..."
+      }
+    }
+  }
+}
+```
+
+**Claude Code** (`.claude/settings.json`):
+```json
+{
+  "mcpServers": {
+    "caldave": {
+      "command": "node",
+      "args": ["/path/to/caldave/src/mcp.mjs"],
+      "env": {
+        "CALDAVE_API_KEY": "sk_live_..."
+      }
+    }
+  }
+}
+```
+
+**Environment variables:**
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CALDAVE_API_KEY` | Yes | — | Agent API key (Bearer token) |
+| `CALDAVE_URL` | No | `https://caldave.ai` | CalDave server URL |
 
 ---
 

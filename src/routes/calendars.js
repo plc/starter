@@ -62,6 +62,12 @@ router.post('/', async (req, res) => {
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
     }
+    if (name.length > 255) {
+      return res.status(400).json({ error: 'name exceeds 255 character limit' });
+    }
+    if (timezone && timezone.length > 64) {
+      return res.status(400).json({ error: 'timezone exceeds 64 character limit' });
+    }
 
     const id = calendarId();
     const token = feedToken();
@@ -131,6 +137,19 @@ router.patch('/:id', async (req, res) => {
     if (!cal) return;
 
     const { name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key } = req.body;
+
+    // Input validation
+    if (name !== undefined && name.length > 255) {
+      return res.status(400).json({ error: 'name exceeds 255 character limit' });
+    }
+    if (timezone !== undefined && timezone.length > 64) {
+      return res.status(400).json({ error: 'timezone exceeds 64 character limit' });
+    }
+    if (webhook_url !== undefined && webhook_url !== null) {
+      try { new URL(webhook_url); } catch {
+        return res.status(400).json({ error: 'webhook_url must be a valid URL' });
+      }
+    }
 
     // Build dynamic SET clause from provided fields
     const updates = [];

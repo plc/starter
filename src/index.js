@@ -17,9 +17,10 @@
 
 const path = require('path');
 const express = require('express');
+const helmet = require('helmet');
 const { pool, initSchema } = require('./db');
 const auth = require('./middleware/auth');
-const rateLimitStub = require('./middleware/rateLimitStub');
+const { apiLimiter, agentCreationLimiter, inboundLimiter } = require('./middleware/rateLimit');
 const agentsRouter = require('./routes/agents');
 const calendarsRouter = require('./routes/calendars');
 const eventsRouter = require('./routes/events');
@@ -27,6 +28,7 @@ const feedsRouter = require('./routes/feeds');
 const inboundRouter = require('./routes/inbound');
 const docsRouter = require('./routes/docs');
 const quickstartRouter = require('./routes/quickstart');
+const viewRouter = require('./routes/view');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
@@ -36,8 +38,17 @@ const port = process.env.PORT || 3000;
 // Middleware
 // ---------------------------------------------------------------------------
 
-app.use(express.json());
-app.use(rateLimitStub);
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'script-src': ["'self'", "'unsafe-inline'"],
+      'upgrade-insecure-requests': null,
+    },
+  },
+}));
+app.use(express.json({ limit: '512kb' }));
+app.use(apiLimiter);
 
 // ---------------------------------------------------------------------------
 // Public routes (no auth)
@@ -145,15 +156,14 @@ curl -X POST https://${DOMAIN}/agents</code></pre>
 // API documentation and quick start (no auth)
 app.use('/docs', docsRouter);
 app.use('/quickstart', quickstartRouter);
-
-// Agent provisioning (no auth)
-app.use('/agents', agentsRouter);
+// Agent provisioning (no auth, strict rate limit)
+app.use('/agents', agentCreationLimiter, agentsRouter);
 
 // iCal feeds (no Bearer auth — uses feed_token query param)
 app.use('/feeds', feedsRouter);
 
 // Inbound email webhook (no Bearer auth — token in URL authenticates)
-app.use('/inbound', inboundRouter);
+app.use('/inbound', inboundLimiter, inboundRouter);
 
 // ---------------------------------------------------------------------------
 // Authenticated routes
@@ -162,6 +172,7 @@ app.use('/inbound', inboundRouter);
 app.use('/calendars', auth, calendarsRouter);
 // Event routes are nested under /calendars/:id but handled by eventsRouter
 app.use('/calendars', auth, eventsRouter);
+app.use('/calendars', auth, viewRouter);
 
 /**
  * GET /errors
@@ -171,16 +182,16 @@ app.use('/calendars', auth, eventsRouter);
 app.get('/errors', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const conditions = [];
-    const values = [];
-    let idx = 1;
+    const conditions = [`agent_id = $1`];
+    const values = [req.agent.id];
+    let idx = 2;
 
     if (req.query.route) {
       conditions.push(`route ILIKE $${idx++}`);
       values.push(`%${req.query.route}%`);
     }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const where = `WHERE ${conditions.join(' AND ')}`;
     values.push(limit);
 
     const { rows } = await pool.query(
@@ -200,13 +211,13 @@ app.get('/errors', auth, async (req, res) => {
 
 /**
  * GET /errors/:id
- * Get a single error with full stack trace.
+ * Get a single error with full stack trace. Scoped to the authenticated agent.
  */
 app.get('/errors/:id', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM error_log WHERE id = $1',
-      [req.params.id]
+      'SELECT * FROM error_log WHERE id = $1 AND agent_id = $2',
+      [req.params.id, req.agent.id]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Error not found' });

@@ -7,7 +7,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node --test tests/api.test.js",
-    "healthcheck": "node src/healthcheck.js"
+    "healthcheck": "node src/healthcheck.js",
+    "mcp": "node src/mcp.mjs"
   },
   "keywords": [
     "calendar",
@@ -18,12 +19,16 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
     "ical-generator": "^10.0.0",
     "nanoid": "^5.1.6",
     "node-ical": "^0.25.1",
     "pg": "^8.11.3",
-    "rrule": "^2.8.1"
+    "rrule": "^2.8.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10"

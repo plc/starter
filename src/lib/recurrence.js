@@ -39,6 +39,15 @@ const MAX_INSTANCES_PER_WINDOW = 1000;
 function parseAndValidateRRule(rruleString, dtstart) {
   try {
     const options = RRule.parseString(rruleString);
+
+    // Reject SECONDLY and MINUTELY — expansion is too expensive (can block event loop for 18s+)
+    if (options.freq === RRule.SECONDLY) {
+      return { valid: false, error: 'FREQ=SECONDLY is not supported' };
+    }
+    if (options.freq === RRule.MINUTELY) {
+      return { valid: false, error: 'FREQ=MINUTELY is not supported' };
+    }
+
     options.dtstart = dtstart;
     const rule = new RRule(options);
 

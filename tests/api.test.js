@@ -418,7 +418,7 @@ describe('Recurring events — validation', { concurrency: 1 }, () => {
       },
     });
     assert.equal(status, 400);
-    assert.ok(data.error.includes('too many') || data.error.includes('instances'), data.error);
+    assert.ok(data.error.includes('not supported') || data.error.includes('too many') || data.error.includes('instances'), data.error);
   });
 
   it('rejects invalid RRULE string', async () => {
@@ -744,7 +744,7 @@ describe('Inbound email — per-calendar token', { concurrency: 1 }, () => {
     assert.ok(data.event_id);
   });
 
-  it('invalid token returns 404', async () => {
+  it('invalid token returns 200 with ignored status', async () => {
     const ics = makeIcs({
       uid: 'bad-token@example.com',
       summary: 'Test',
@@ -752,11 +752,12 @@ describe('Inbound email — per-calendar token', { concurrency: 1 }, () => {
       dtend: '20990801T110000Z',
     });
 
-    const { status } = await api('POST', '/inbound/invalid_token_xyz', {
+    const { status, data } = await api('POST', '/inbound/invalid_token_xyz', {
       body: postmarkPayload(ics, 'anything@example.com'),
     });
 
-    assert.equal(status, 404);
+    assert.equal(status, 200);
+    assert.equal(data.status, 'ignored');
   });
 
   after(async () => {
@@ -912,7 +913,328 @@ describe('Error log endpoint', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 17. Cleanup
+// 17. Input validation
+// ---------------------------------------------------------------------------
+
+describe('Input validation', { concurrency: 1 }, () => {
+  let valCalId;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Validation Test Cal' },
+    });
+    valCalId = cal.calendar_id;
+  });
+
+  // Calendar validation
+  it('rejects calendar name > 255 chars', async () => {
+    const { status, data } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'x'.repeat(256) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('255'));
+  });
+
+  it('rejects calendar timezone > 64 chars', async () => {
+    const { status, data } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'TZ Test', timezone: 'x'.repeat(65) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('64'));
+  });
+
+  it('rejects invalid webhook_url on PATCH', async () => {
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}`, {
+      token: state.apiKey,
+      body: { webhook_url: 'not a url' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('webhook_url'));
+  });
+
+  it('accepts valid webhook_url on PATCH', async () => {
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}`, {
+      token: state.apiKey,
+      body: { webhook_url: 'https://example.com/webhook' },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.webhook_url, 'https://example.com/webhook');
+  });
+
+  it('clears webhook_url with null', async () => {
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}`, {
+      token: state.apiKey,
+      body: { webhook_url: null },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.webhook_url, null);
+  });
+
+  // Event validation
+  it('rejects event title > 500 chars on POST', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'x'.repeat(501), start: futureDate(1), end: futureDate(2) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('title'));
+  });
+
+  it('rejects event location > 500 chars on POST', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Test', start: futureDate(1), end: futureDate(2), location: 'x'.repeat(501) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('location'));
+  });
+
+  it('rejects event title > 500 chars on PATCH', async () => {
+    const { data: created } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Temp', start: futureDate(1), end: futureDate(2) },
+    });
+
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}/events/${created.id}`, {
+      token: state.apiKey,
+      body: { title: 'x'.repeat(501) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('title'));
+
+    await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
+  it('rejects FREQ=MINUTELY', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: {
+        title: 'Minutely',
+        start: futureDate(1),
+        end: futureDate(1.25),
+        recurrence: 'FREQ=MINUTELY',
+      },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('not supported'), data.error);
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${valCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 18. Event list filters
+// ---------------------------------------------------------------------------
+
+describe('Event list filters', { concurrency: 1 }, () => {
+  let filterCalId;
+  let earlyId, midId, lateId;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Filter Test Cal' },
+    });
+    filterCalId = cal.calendar_id;
+
+    // Create 3 events at different times
+    const { data: e1 } = await api('POST', `/calendars/${filterCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Early', start: futureDate(24), end: futureDate(25) },
+    });
+    earlyId = e1.id;
+
+    const { data: e2 } = await api('POST', `/calendars/${filterCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Mid', start: futureDate(48), end: futureDate(49) },
+    });
+    midId = e2.id;
+
+    const { data: e3 } = await api('POST', `/calendars/${filterCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Late', start: futureDate(72), end: futureDate(73) },
+    });
+    lateId = e3.id;
+
+    // Cancel the mid event for status filtering
+    await api('POST', `/calendars/${filterCalId}/events/${midId}/respond`, {
+      token: state.apiKey,
+      body: { response: 'declined' },
+    });
+  });
+
+  it('filters by start date', async () => {
+    const { data } = await api('GET', `/calendars/${filterCalId}/events?start=${futureDate(36)}`, {
+      token: state.apiKey,
+    });
+    const ids = data.events.map(e => e.id);
+    assert.ok(!ids.includes(earlyId), 'Early event should be excluded');
+    assert.ok(ids.includes(midId) || ids.includes(lateId), 'Later events should be included');
+  });
+
+  it('filters by end date', async () => {
+    const { data } = await api('GET', `/calendars/${filterCalId}/events?end=${futureDate(36)}`, {
+      token: state.apiKey,
+    });
+    const ids = data.events.map(e => e.id);
+    assert.ok(ids.includes(earlyId), 'Early event should be included');
+    assert.ok(!ids.includes(lateId), 'Late event should be excluded');
+  });
+
+  it('filters by status=cancelled', async () => {
+    const { data } = await api('GET', `/calendars/${filterCalId}/events?status=cancelled`, {
+      token: state.apiKey,
+    });
+    assert.ok(data.events.every(e => e.status === 'cancelled'));
+    assert.ok(data.events.some(e => e.id === midId));
+  });
+
+  it('respects limit parameter', async () => {
+    const { data } = await api('GET', `/calendars/${filterCalId}/events?limit=1`, {
+      token: state.apiKey,
+    });
+    assert.equal(data.events.length, 1);
+  });
+
+  it('combined filters work (start + status)', async () => {
+    const { data } = await api('GET', `/calendars/${filterCalId}/events?start=${futureDate(36)}&status=confirmed`, {
+      token: state.apiKey,
+    });
+    assert.ok(data.events.every(e => e.status === 'confirmed'));
+    assert.ok(!data.events.some(e => e.id === earlyId));
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${filterCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 19. DELETE future mode (recurring)
+// ---------------------------------------------------------------------------
+
+describe('Recurring events — delete future', { concurrency: 1 }, () => {
+  let futureCalId;
+  let parentId;
+  let instances;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Future Delete Cal' },
+    });
+    futureCalId = cal.calendar_id;
+
+    // Create a daily recurring event
+    const { data: parent } = await api('POST', `/calendars/${futureCalId}/events`, {
+      token: state.apiKey,
+      body: {
+        title: 'Daily Task',
+        start: futureDate(1),
+        end: futureDate(1.5),
+        recurrence: 'FREQ=DAILY',
+      },
+    });
+    parentId = parent.id;
+
+    // Fetch instances
+    const { data: evts } = await api('GET', `/calendars/${futureCalId}/events?limit=200`, {
+      token: state.apiKey,
+    });
+    instances = evts.events
+      .filter(e => e.parent_event_id === parentId)
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+  });
+
+  it('DELETE ?mode=future cancels current + removes future instances', async () => {
+    // Pick instance #5 (middle-ish)
+    const target = instances[4];
+    const { status } = await api('DELETE', `/calendars/${futureCalId}/events/${target.id}?mode=future`, {
+      token: state.apiKey,
+    });
+    assert.equal(status, 204);
+
+    // Verify: instances 0-3 still exist and are not cancelled
+    for (let i = 0; i < 4; i++) {
+      const { data } = await api('GET', `/calendars/${futureCalId}/events/${instances[i].id}`, {
+        token: state.apiKey,
+      });
+      assert.notEqual(data.status, 'cancelled', `Instance ${i} should not be cancelled`);
+    }
+
+    // Verify: target is cancelled
+    const { data: targetEvt } = await api('GET', `/calendars/${futureCalId}/events/${target.id}`, {
+      token: state.apiKey,
+    });
+    assert.equal(targetEvt.status, 'cancelled');
+  });
+
+  it('parent RRULE now has UNTIL', async () => {
+    const { data } = await api('GET', `/calendars/${futureCalId}/events/${parentId}`, {
+      token: state.apiKey,
+    });
+    assert.ok(data.recurrence.includes('UNTIL'), `RRULE should have UNTIL, got: ${data.recurrence}`);
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${futureCalId}/events/${parentId}?mode=all`, { token: state.apiKey });
+    await api('DELETE', `/calendars/${futureCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 20. Docs and quickstart routes
+// ---------------------------------------------------------------------------
+
+describe('Documentation routes', { concurrency: 1 }, () => {
+  it('GET /docs returns HTML', async () => {
+    const { status, data, headers } = await api('GET', '/docs', { raw: true });
+    assert.equal(status, 200);
+    assert.ok(headers.get('content-type').includes('text/html'));
+    assert.ok(data.includes('CalDave'));
+  });
+
+  it('GET /quickstart returns HTML', async () => {
+    const { status, data, headers } = await api('GET', '/quickstart', { raw: true });
+    assert.equal(status, 200);
+    assert.ok(headers.get('content-type').includes('text/html'));
+    assert.ok(data.includes('Quick Start'));
+  });
+
+  it('GET / returns landing page', async () => {
+    const { status, data, headers } = await api('GET', '/', { raw: true });
+    assert.equal(status, 200);
+    assert.ok(headers.get('content-type').includes('text/html'));
+    assert.ok(data.includes('CalDave'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 21. Error log — agent scoping
+// ---------------------------------------------------------------------------
+
+describe('Error log — agent scoping', { concurrency: 1 }, () => {
+  it('agent cannot see errors from another agent', async () => {
+    // Create a second agent
+    const { data: agent2 } = await api('POST', '/agents');
+
+    // Trigger an error for agent2 by hitting a bad calendar ID
+    await api('GET', '/calendars/cal_nonexistent/events', { token: agent2.api_key });
+
+    // Our agent should NOT see agent2's errors
+    const { data } = await api('GET', '/errors', { token: state.apiKey });
+    const otherAgentErrors = data.errors.filter(e => e.agent_id !== state.agentId && e.agent_id !== null);
+    assert.equal(otherAgentErrors.length, 0, 'Should not see errors from other agents');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 22. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

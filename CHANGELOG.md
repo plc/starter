@@ -45,7 +45,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **Postmark inbound domain support** — `POST /inbound` accepts emails from a Postmark inbound domain server (e.g. `*@invite.caldave.ai`). Parses the `To` address to route to the correct calendar. Shared processing logic with per-calendar `/:token` route.
   - **Recurring event support for inbound invites** — extracts RRULE from inbound `.ics` VEVENT, creates recurring parent with materialized instances (same as API-created recurring events). Updates rematerialize instances when times/RRULE change. Falls back to single event if RRULE is invalid.
 - **Error logging** — API errors are persisted to an `error_log` PostgreSQL table with route, method, message, stack trace, and agent ID. Queryable via `GET /errors` (auth required, supports `?route=` filter and `?limit=`) and `GET /errors/:id` for full stack traces.
+- **MCP server** (`src/mcp.mjs`) — Model Context Protocol server exposing 8 tools for AI agents. Uses STDIO transport. Wraps the REST API via HTTP (thin client, no direct DB access). Tools: `caldave_list_calendars`, `caldave_create_calendar`, `caldave_get_upcoming`, `caldave_list_events`, `caldave_create_event`, `caldave_update_event`, `caldave_delete_event`, `caldave_respond_to_invite`. Requires `CALDAVE_API_KEY` env var. Works with Claude Desktop, Claude Code, and any MCP client.
+- **Calendar view endpoint** (`GET /calendars/:id/view`) — plain text table of upcoming events, curl-friendly
 - Integration test suite (`tests/api.test.js`) using Node.js built-in `node:test` runner
+
+### Security
+- **Error log agent scoping** — `GET /errors` and `GET /errors/:id` now filter by `agent_id`, so agents can only see their own errors
+- **Rate limiting** — replaced stub headers with real enforcement via `express-rate-limit` (200/min API, 5/hour agent creation, 60/min inbound webhooks)
+- **Security headers** — added `helmet` middleware (X-Content-Type-Options, X-Frame-Options, HSTS, CSP, etc.)
+- **Request body size limit** — explicit 512KB limit on `express.json()` to prevent oversized payloads
+- **Inbound webhook token hardening** — invalid tokens now return 200 (not 404) to prevent token validity enumeration
+- **RRULE frequency restriction** — reject `FREQ=SECONDLY` and `FREQ=MINUTELY` (expansion blocks event loop for 18s+)
+- **init-db.sh SQL quoting** — `CREATE DATABASE` now uses quoted identifier to prevent SQL injection via `DB_NAME`
+- **Input validation** — length limits on calendar name (255), timezone (64), event title (500), location (500); webhook URL format validation
 
 ### Changed
 - Renamed project from `myapp` to `caldave`

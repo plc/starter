@@ -26,7 +26,7 @@ if psql "$BASE_URL" -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" |
   echo "Database '$DB_NAME' already exists."
 else
   echo "Creating database '$DB_NAME'..."
-  psql "$BASE_URL" -c "CREATE DATABASE $DB_NAME"
+  psql "$BASE_URL" -c "CREATE DATABASE \"$DB_NAME\""
   echo "Database '$DB_NAME' created."
 fi
 

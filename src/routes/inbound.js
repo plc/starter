@@ -570,7 +570,8 @@ router.post('/:token', async (req, res) => {
     );
 
     if (calendars.length === 0) {
-      return res.status(404).json({ error: 'Invalid inbound webhook token' });
+      // Return 200 to avoid leaking token validity and prevent webhook retries
+      return res.json({ status: 'ignored', reason: 'Unknown webhook' });
     }
 
     return await processInboundEmail(calendars[0], req.body, res);

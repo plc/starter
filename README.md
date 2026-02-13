@@ -20,6 +20,7 @@ A calendar-as-a-service API for AI agents. Agents own calendars, create and mana
 - **PostgreSQL** database with auto-initializing schema
 - **Docker** setup for local development
 - **Fly.io** configuration for production deployment
+- **MCP server** for AI agents using the Model Context Protocol
 - **Status page** at `/` showing server and database health
 
 ## Prerequisites
@@ -83,6 +84,7 @@ curl -s http://127.0.0.1:3720/calendars/CAL_ID/upcoming \
 | `PATCH /calendars/:id/events/:eid` | Yes | Update event |
 | `DELETE /calendars/:id/events/:eid` | Yes | Delete event |
 | `GET /calendars/:id/upcoming` | Yes | Next N events from now |
+| `GET /calendars/:id/view` | Yes | Plain text table of upcoming events |
 | `POST /calendars/:id/events/:eid/respond` | Yes | Accept/decline invite |
 | `GET /feeds/:id.ics?token=TOKEN` | Feed token | iCal feed (subscribable) |
 | `POST /inbound/:token` | Token in URL | Inbound email webhook (per-calendar) |
@@ -104,13 +106,14 @@ See [CALDAVE_SPEC.md](CALDAVE_SPEC.md) for full request/response examples.
 │   │   └── recurrence.js     # RRULE parsing + instance materialization
 │   ├── middleware/
 │   │   ├── auth.js           # Bearer token auth
-│   │   └── rateLimitStub.js  # Stub rate limit headers
+│   │   └── rateLimit.js      # Rate limiting (express-rate-limit)
 │   └── routes/
 │       ├── agents.js         # POST /agents
 │       ├── calendars.js      # Calendar CRUD
 │       ├── events.js         # Event CRUD + upcoming + respond
 │       ├── feeds.js          # iCal feed generation
 │       └── inbound.js        # Inbound email webhook (per-calendar token URL)
+│   └── mcp.mjs              # MCP server (STDIO transport, 8 tools)
 ├── scripts/
 │   ├── init-db.sh            # Creates database if it doesn't exist
 │   └── get-port.sh           # Generates deterministic port from project name
@@ -238,6 +241,7 @@ Use `http://127.0.0.1:3720` instead of `localhost`, or use an incognito window.
 | `npm start` | Start the server |
 | `npm run dev` | Start with auto-reload (Node.js --watch) |
 | `npm test` | Run health check against running server |
+| `npm run mcp` | Start MCP server (STDIO transport) |
 
 ## License
 

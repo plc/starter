@@ -91,6 +91,7 @@ router.get('/', (req, res) => {
         <li><a href="#patch-event">PATCH /calendars/:id/events/:eid</a> — Update event</li>
         <li><a href="#delete-event">DELETE /calendars/:id/events/:eid</a> — Delete event</li>
         <li><a href="#get-upcoming">GET /calendars/:id/upcoming</a> — Upcoming events</li>
+        <li><a href="#get-view">GET /calendars/:id/view</a> — Plain text calendar view</li>
         <li><a href="#post-respond">POST /calendars/:id/events/:eid/respond</a> — Respond to invite</li>
       </ul>
       <div class="section">Feeds &amp; Webhooks</div>
@@ -359,6 +360,30 @@ router.get('/', (req, res) => {
   "next_event_starts_in": "PT14M30S"
 }</code></pre>
       <div class="note"><code class="inline-code">next_event_starts_in</code> is an ISO 8601 duration showing how long until the next event. Useful for setting poll intervals.</div>
+    </div>
+
+    <div class="endpoint" id="get-view">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/calendars/:id/view</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Plain text table of upcoming events. Useful for quick inspection via curl or agent debugging.</p>
+      <div class="label">Query parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">limit</span><span class="param-desc">Number of events to show (default 10, max 50)</span></div>
+      </div>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/view \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Response (text/plain)</div>
+      <pre><code>Work (cal_xxx)  tz: America/Denver
+-----------------------------------------
+TITLE          START                 ...
+-----------------------------------------
+Daily standup  2026-02-13 16:00:00Z  ...
+-----------------------------------------
+1 event(s)</code></pre>
     </div>
 
     <div class="endpoint" id="post-respond">
