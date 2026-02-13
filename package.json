@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node src/healthcheck.js"
+    "test": "node --test tests/api.test.js",
+    "healthcheck": "node src/healthcheck.js"
   },
   "keywords": [
     "calendar",
@@ -18,7 +19,13 @@
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
+    "ical-generator": "^10.0.0",
     "nanoid": "^5.1.6",
-    "pg": "^8.11.3"
+    "node-ical": "^0.25.1",
+    "pg": "^8.11.3",
+    "rrule": "^2.8.1"
+  },
+  "devDependencies": {
+    "@flydotio/dockerfile": "^0.7.10"
   }
 }

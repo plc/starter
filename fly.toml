@@ -1,37 +1,26 @@
-# Fly.io deployment configuration
+# fly.toml app configuration file generated for caldave on 2026-02-12T19:23:49-07:00
 #
-# First-time setup:
-#   1. Run `fly launch` to create your app and update this file
-#   2. Run `fly postgres create --name myapp-db` to create a database
-#   3. Run `fly postgres attach myapp-db` to connect the database
-#   4. Run `fly deploy` to deploy
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Subsequent deploys:
-#   fly deploy
-#
-# The app name below will be replaced by `fly launch`
 
-app = "REPLACE_WITH_YOUR_APP_NAME"
-primary_region = "sjc"
+app = 'caldave'
+primary_region = 'sjc'
 
-# Build using the Dockerfile
 [build]
 
-# Environment variables (DATABASE_URL is set automatically by fly postgres attach)
 [env]
-  PORT = "3000"
+  PORT = '3000'
 
-# HTTP service configuration
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = "stop"    # Stop machine when idle (saves money)
-  auto_start_machines = true     # Start machine on incoming request
-  min_machines_running = 0       # Allow all machines to stop when idle
-  processes = ["app"]
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
-# VM resources (minimal for starter app)
 [[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
+  memory = '256mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 256

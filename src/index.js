@@ -5,7 +5,7 @@
  * - Schema initialization on startup
  * - Auth middleware (Bearer token)
  * - Rate limit stub headers
- * - Route modules (agents, calendars, events)
+ * - Route modules (agents, calendars, events, feeds)
  * - Health check endpoints
  * - Status page
  *
@@ -22,6 +22,9 @@ const rateLimitStub = require('./middleware/rateLimitStub');
 const agentsRouter = require('./routes/agents');
 const calendarsRouter = require('./routes/calendars');
 const eventsRouter = require('./routes/events');
+const feedsRouter = require('./routes/feeds');
+const inboundRouter = require('./routes/inbound');
+const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -169,6 +172,8 @@ app.get('/', async (req, res) => {
       <a><code>POST /calendars</code> — Create calendar</a>
       <a><code>GET /calendars</code> — List calendars</a>
       <a><code>GET /calendars/:id/upcoming</code> — Upcoming events</a>
+      <a><code>GET /feeds/:id.ics</code> — iCal feed (token auth)</a>
+      <a><code>POST /inbound/:token</code> — Inbound email webhook (per-calendar)</a>
     </div>
   </div>
 </body>
@@ -179,6 +184,12 @@ app.get('/', async (req, res) => {
 
 // Agent provisioning (no auth)
 app.use('/agents', agentsRouter);
+
+// iCal feeds (no Bearer auth — uses feed_token query param)
+app.use('/feeds', feedsRouter);
+
+// Inbound email webhook (no Bearer auth — token in URL authenticates)
+app.use('/inbound', inboundRouter);
 
 // ---------------------------------------------------------------------------
 // Authenticated routes
@@ -209,6 +220,18 @@ async function start() {
     console.error('Failed to initialize schema:', err.message);
     console.error('Server starting without schema — DB may not be ready yet');
   }
+
+  // Extend materialization horizons for recurring events
+  extendAllHorizons(pool).catch(err => {
+    console.error('Failed to extend horizons on startup:', err.message);
+  });
+
+  // Schedule daily horizon extension
+  setInterval(() => {
+    extendAllHorizons(pool).catch(err => {
+      console.error('Horizon extension error:', err.message);
+    });
+  }, EXTEND_INTERVAL_MS);
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`CalDave running on port ${port}`);

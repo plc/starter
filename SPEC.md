@@ -40,8 +40,10 @@ fly deploy
 | `DELETE /calendars/:id/events/:eid` | Yes | Delete event |
 | `GET /calendars/:id/upcoming` | Yes | Next N events from now |
 | `POST /calendars/:id/events/:eid/respond` | Yes | Accept/decline invite |
+| `GET /feeds/:id.ics?token=TOKEN` | Feed token | iCal feed (subscribable) |
+| `POST /inbound/:token` | Token in URL | Inbound email webhook (per-calendar) |
 
-Auth = `Authorization: Bearer <api_key>`
+Auth = `Authorization: Bearer <api_key>` (except feeds, which use `?token=` query param)
 
 ## Project Structure
 
@@ -51,15 +53,18 @@ src/
 ├── healthcheck.js        — Health check script (npm test)
 ├── db.js                 — Postgres pool + schema init
 ├── lib/
-│   ├── ids.js            — nanoid-based ID generation (agt_, cal_, evt_)
-│   └── keys.js           — SHA-256 API key hashing
+│   ├── ids.js            — nanoid-based ID generation (agt_, cal_, evt_, inb_)
+│   ├── keys.js           — SHA-256 API key hashing
+│   └── recurrence.js     — RRULE parsing, materialization, horizon management
 ├── middleware/
 │   ├── auth.js           — Bearer token auth
 │   └── rateLimitStub.js  — Stub rate limit headers
 └── routes/
     ├── agents.js         — POST /agents
     ├── calendars.js      — Calendar CRUD
-    └── events.js         — Event CRUD + upcoming + respond
+    ├── events.js         — Event CRUD + upcoming + respond
+    ├── feeds.js          — iCal feed generation
+    └── inbound.js        — Inbound email webhook (per-calendar token URL)
 scripts/
 ├── init-db.sh            — Creates DB if not exists (Docker)
 └── get-port.sh           — Deterministic port from project name
@@ -71,7 +76,17 @@ Three tables: `agents`, `calendars`, `events`. Schema auto-created on startup.
 
 See `CALDAVE_SPEC.md` for full column definitions.
 
-Key indexes: `events(calendar_id, start_time)`, `events(calendar_id, status)`, `calendars(email)`, `calendars(agent_id)`.
+Key indexes: `events(calendar_id, start_time)`, `events(calendar_id, status)`, `calendars(email)`, `calendars(agent_id)`, `calendars(inbound_token)` (partial), `events(parent_event_id)`, `events(parent_event_id, occurrence_date)` (unique, partial), `events(calendar_id, ical_uid)` (partial, for inbound email updates).
+
+## Recurring Events
+
+Events can include a `recurrence` field (RFC 5545 RRULE string, e.g. `FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`). When set, the event becomes a "parent" with `status = 'recurring'`, and individual occurrences are materialized as separate rows linked via `parent_event_id`.
+
+- Parent rows are excluded from list/upcoming/feed queries
+- Instances materialize 90 days ahead; a daily job extends the horizon
+- Individual instances can be modified (become exceptions) or cancelled
+- DELETE supports `?mode=single|future|all` for recurring events
+- Max 1000 instances per 90-day window (rejects very high-frequency rules)
 
 ## Environment Variables
 
@@ -88,11 +103,10 @@ Key indexes: `events(calendar_id, start_time)`, `events(calendar_id, status)`, `
 - Stored as SHA-256 hash (direct DB lookup, no iteration)
 - Agent scoping: each agent only sees their own calendars/events
 
-## Deferred (not in v1)
+## Deferred
 
-- Recurring events / RRULE expansion
-- Inbound email parsing
+- DST-aware recurrence (times currently repeat at same UTC offset, may drift ±1h across DST)
+- iCal feed with RRULE + EXDATE (currently emits individual VEVENTs)
 - Webhooks / push notifications (pg-boss)
-- iCal feed generation
 - MCP tools
 - Real rate limiting (headers are stubbed)

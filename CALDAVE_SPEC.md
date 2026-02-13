@@ -108,7 +108,8 @@ Create a new calendar for the authenticated agent.
 ```json
 {
   "name": "Work Schedule",
-  "timezone": "America/Denver"
+  "timezone": "America/Denver",
+  "agentmail_api_key": "am_xxx..."
 }
 ```
 
@@ -121,7 +122,8 @@ Create a new calendar for the authenticated agent.
   "email": "cal-a1b2c3@caldave.fly.dev",
   "ical_feed_url": "https://caldave.fly.dev/feeds/cal_a1b2c3.ics?token=feed_xyz789",
   "feed_token": "feed_xyz789",
-  "message": "This calendar can receive invites at cal-a1b2c3@caldave.fly.dev. Save this information."
+  "inbound_webhook_url": "https://caldave.fly.dev/inbound/inb_abc123...",
+  "message": "This calendar can receive invites at cal-a1b2c3@caldave.fly.dev. Forward emails to https://caldave.fly.dev/inbound/inb_abc123.... Save this information."
 }
 ```
 
@@ -243,6 +245,45 @@ Read-only iCalendar feed. Can be subscribed to from Google Calendar, Apple Calen
 
 ---
 
+### Inbound Email
+
+#### `POST /inbound/:token`
+Per-calendar webhook endpoint for receiving forwarded emails containing `.ics` calendar invite attachments.
+
+No Bearer auth. The unguessable `inbound_token` in the URL authenticates the request. Each calendar gets its own unique webhook URL (returned at creation as `inbound_webhook_url`).
+
+Supports multiple email-to-webhook providers:
+- **Postmark Inbound** — attachments include base64 content inline in the webhook payload
+- **AgentMail** — webhook delivers attachment metadata; CalDave fetches `.ics` content via the AgentMail API using the calendar's `agentmail_api_key`
+
+For AgentMail, set the `agentmail_api_key` on the calendar via `POST /calendars` or `PATCH /calendars/:id`.
+
+**Behavior by iCal METHOD:**
+
+| METHOD | Action |
+|--------|--------|
+| `REQUEST` / `PUBLISH` | Creates event (or updates if `ical_uid` matches existing event) |
+| `CANCEL` | Sets matching event status to `cancelled` |
+| Other | Ignored (returns 200) |
+
+**New event fields:**
+- `source: 'inbound_email'`
+- `status: 'tentative'` (agent must accept/decline via `/respond`)
+- `organiser_email` — from the ORGANIZER field in the `.ics`
+- `ical_uid` — from the UID field, used to match updates and cancellations
+
+**Response (always 200 to prevent Postmark retries):**
+```json
+{ "status": "created", "event_id": "evt_xxx" }
+{ "status": "updated", "event_id": "evt_xxx" }
+{ "status": "cancelled", "event_id": "evt_xxx" }
+{ "status": "ignored", "reason": "..." }
+```
+
+**Reschedule behavior:** If an inbound update changes the event times and the agent had already accepted, the status resets to `tentative` so the agent can re-confirm.
+
+---
+
 ## MCP Tool Definitions
 
 For agents using MCP, CalDave exposes these tools:
@@ -283,6 +324,8 @@ MCP auth: The agent's API key is passed as a config parameter when registering t
 | `webhook_url` | `text` | Nullable |
 | `webhook_secret` | `text` | Nullable |
 | `webhook_offsets` | `jsonb` | Default `["-5m"]` |
+| `inbound_token` | `text` UNIQUE | `inb_` prefixed, for per-calendar webhook URL |
+| `agentmail_api_key` | `text` | Nullable, for fetching AgentMail attachments |
 | `created_at` | `timestamptz` | |
 
 ### `events`
@@ -308,7 +351,9 @@ MCP auth: The agent's API key is passed as a config parameter when registering t
 **Indexes:**
 - `events(calendar_id, start_time)` — for range queries
 - `events(calendar_id, status)` — for filtering
+- `events(calendar_id, ical_uid)` — partial index for inbound email update/cancel matching
 - `calendars(email)` — for inbound email lookup
+- `calendars(inbound_token)` — partial index for webhook URL lookup
 
 ### `webhook_deliveries`
 | Column | Type | Notes |
@@ -354,9 +399,9 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 | Database | Postgres |
 | Containerisation | Docker |
 | Hosting | Fly.io |
-| Inbound email | Postmark Inbound (or SendGrid Inbound Parse) |
+| Inbound email | Postmark Inbound |
 | iCal generation | `ical-generator` npm package |
-| iCal parsing | `ical.js` (or `node-ical`) npm package |
+| iCal parsing | `node-ical` npm package |
 | Webhook scheduling | `pg-boss` (Postgres-backed job queue) |
 
 ---

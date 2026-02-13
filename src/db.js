@@ -10,6 +10,7 @@
  */
 
 const { Pool } = require('pg');
+const { inboundToken } = require('./lib/ids');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -36,6 +37,7 @@ async function initSchema() {
       webhook_url     text,
       webhook_secret  text,
       webhook_offsets jsonb DEFAULT '[\"-5m\"]',
+      inbound_token   text UNIQUE,
       created_at      timestamptz NOT NULL DEFAULT now()
     );
 
@@ -70,7 +72,46 @@ async function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_calendars_agent
       ON calendars (agent_id);
+
+    -- Per-calendar inbound webhook token
+    ALTER TABLE calendars ADD COLUMN IF NOT EXISTS inbound_token text UNIQUE;
+
+    CREATE INDEX IF NOT EXISTS idx_calendars_inbound_token
+      ON calendars (inbound_token)
+      WHERE inbound_token IS NOT NULL;
+
+    -- Recurring event support: link instances to parent series
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS parent_event_id text REFERENCES events(id) ON DELETE CASCADE;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS occurrence_date date;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS is_exception boolean NOT NULL DEFAULT false;
+
+    CREATE INDEX IF NOT EXISTS idx_events_parent
+      ON events (parent_event_id);
+
+    -- Prevent duplicate instances for the same parent + date
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_events_parent_occurrence
+      ON events (parent_event_id, occurrence_date)
+      WHERE parent_event_id IS NOT NULL;
+
+    -- Fast lookup by ical_uid for inbound email updates/cancellations
+    CREATE INDEX IF NOT EXISTS idx_events_ical_uid
+      ON events (calendar_id, ical_uid)
+      WHERE ical_uid IS NOT NULL;
+
+    -- Per-calendar AgentMail API key for fetching attachments
+    ALTER TABLE calendars ADD COLUMN IF NOT EXISTS agentmail_api_key text;
   `);
+
+  // Backfill inbound_token for existing calendars that don't have one
+  const { rows: missing } = await pool.query(
+    'SELECT id FROM calendars WHERE inbound_token IS NULL'
+  );
+  for (const cal of missing) {
+    await pool.query(
+      'UPDATE calendars SET inbound_token = $1 WHERE id = $2',
+      [inboundToken(), cal.id]
+    );
+  }
 }
 
 module.exports = { pool, initSchema };

@@ -20,6 +20,7 @@ const agentId = () => `agt_${shortId()}`;
 const calendarId = () => `cal_${shortId()}`;
 const eventId = () => `evt_${shortId()}`;
 const feedToken = () => `feed_${longId()}`;
+const inboundToken = () => `inb_${longId()}`;
 const apiKey = () => `sk_live_${longId()}`;
 
-module.exports = { agentId, calendarId, eventId, feedToken, apiKey };
+module.exports = { agentId, calendarId, eventId, feedToken, inboundToken, apiKey };

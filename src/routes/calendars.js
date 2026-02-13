@@ -12,7 +12,7 @@
 
 const { Router } = require('express');
 const { pool } = require('../db');
-const { calendarId, feedToken } = require('../lib/ids');
+const { calendarId, feedToken, inboundToken } = require('../lib/ids');
 
 const router = Router();
 
@@ -45,6 +45,7 @@ function formatCalendar(cal) {
     timezone: cal.timezone,
     email: cal.email,
     ical_feed_url: `https://${DOMAIN}/feeds/${cal.id}.ics?token=${cal.feed_token}`,
+    inbound_webhook_url: cal.inbound_token ? `https://${DOMAIN}/inbound/${cal.inbound_token}` : null,
     webhook_url: cal.webhook_url || null,
     created_at: cal.created_at,
   };
@@ -55,7 +56,7 @@ function formatCalendar(cal) {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, timezone } = req.body;
+    const { name, timezone, agentmail_api_key } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -63,15 +64,17 @@ router.post('/', async (req, res) => {
 
     const id = calendarId();
     const token = feedToken();
+    const inbToken = inboundToken();
     const email = `cal-${id.slice(4)}@${DOMAIN}`;
     const tz = timezone || 'UTC';
 
     await pool.query(
-      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, req.agent.id, name, tz, email, token]
+      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token, inbound_token, agentmail_api_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, req.agent.id, name, tz, email, token, inbToken, agentmail_api_key || null]
     );
 
+    const inboundUrl = `https://${DOMAIN}/inbound/${inbToken}`;
     res.status(201).json({
       calendar_id: id,
       name,
@@ -79,7 +82,8 @@ router.post('/', async (req, res) => {
       email,
       ical_feed_url: `https://${DOMAIN}/feeds/${id}.ics?token=${token}`,
       feed_token: token,
-      message: `This calendar can receive invites at ${email}. Save this information.`,
+      inbound_webhook_url: inboundUrl,
+      message: `This calendar can receive invites at ${email}. Forward emails to ${inboundUrl}. Save this information.`,
     });
   } catch (err) {
     console.error('POST /calendars error:', err.message);
@@ -125,7 +129,7 @@ router.patch('/:id', async (req, res) => {
     const cal = await getOwnedCalendar(req, res);
     if (!cal) return;
 
-    const { name, timezone, webhook_url, webhook_secret, webhook_offsets } = req.body;
+    const { name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key } = req.body;
 
     // Build dynamic SET clause from provided fields
     const updates = [];
@@ -137,6 +141,7 @@ router.patch('/:id', async (req, res) => {
     if (webhook_url !== undefined) { updates.push(`webhook_url = $${idx++}`); values.push(webhook_url); }
     if (webhook_secret !== undefined) { updates.push(`webhook_secret = $${idx++}`); values.push(webhook_secret); }
     if (webhook_offsets !== undefined) { updates.push(`webhook_offsets = $${idx++}`); values.push(JSON.stringify(webhook_offsets)); }
+    if (agentmail_api_key !== undefined) { updates.push(`agentmail_api_key = $${idx++}`); values.push(agentmail_api_key); }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

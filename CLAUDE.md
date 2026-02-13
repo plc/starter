@@ -10,9 +10,40 @@ CalDave is a calendar-as-a-service API for AI agents. The stack is Node.js + Exp
 
 - **Schema-on-startup**: Tables are created via `CREATE TABLE IF NOT EXISTS` in `src/db.js` — no migration tool
 - **Auth**: API keys are SHA-256 hashed and looked up directly by hash (not bcrypt)
-- **IDs**: nanoid with prefixes (`agt_`, `cal_`, `evt_`, `feed_`, `sk_live_`)
+- **IDs**: nanoid with prefixes (`agt_`, `cal_`, `evt_`, `feed_`, `inb_`, `sk_live_`)
 - **Database**: PostgreSQL runs on the **host machine**, not in Docker — accessed via `host.docker.internal:5432`
 - **Port**: 3720 (generated from `./scripts/get-port.sh caldave`)
+
+## QA Testing
+
+Use these credentials to test the API after making changes. The server must be running locally.
+
+```
+Agent ID:    agt_t305j58pF6dj
+API Key:     $CALDAVE_API_KEY
+Calendar ID: cal_t4IXi3cnVzDL
+Email:       cal-t4IXi3cnVzDL@caldave.fly.dev
+```
+
+Quick smoke test:
+```bash
+# Health check
+curl -s http://127.0.0.1:3720/health
+
+# List calendars (verifies auth + DB)
+curl -s http://127.0.0.1:3720/calendars \
+  -H "Authorization: Bearer $CALDAVE_API_KEY"
+
+# Create a test event
+curl -s -X POST http://127.0.0.1:3720/calendars/cal_t4IXi3cnVzDL/events \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CALDAVE_API_KEY" \
+  -d '{"title": "QA test", "start": "2099-01-01T00:00:00Z", "end": "2099-01-01T01:00:00Z"}'
+
+# Check upcoming
+curl -s http://127.0.0.1:3720/calendars/cal_t4IXi3cnVzDL/upcoming \
+  -H "Authorization: Bearer $CALDAVE_API_KEY"
+```
 
 ## Common Tasks
 

@@ -18,8 +18,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Agent scoping — each agent only sees their own calendars and events
 - Rate limit stub headers (X-RateLimit-*)
 - Event size limits (64KB description, 16KB metadata)
-- Calendar email address generation (deferred inbound email, but addresses created)
+- Calendar email address generation
+- iCal feed endpoint (`GET /feeds/:id.ics?token=TOKEN`) — subscribable from Google Calendar, Apple Calendar, etc. Uses `ical-generator` package.
+- **Recurring events** — RRULE-based recurrence with materialized instances
+  - POST events with `recurrence` field (RFC 5545 RRULE string)
+  - Instances materialized as real rows for 90 days ahead
+  - Individual instances can be modified (exceptions) or cancelled
+  - DELETE supports `?mode=single|future|all` for recurring events
+  - PATCH propagates template changes to non-exception instances, or rematerializes on RRULE/timing change
+  - Daily horizon extension job keeps instances 60-90 days ahead
+  - Max 1000 instances per 90-day window guard
+  - Uses `rrule` npm package for RRULE parsing and expansion
 - Full API spec in `CALDAVE_SPEC.md`
+- **Inbound email support** — receive calendar invites via per-calendar webhook URLs
+  - `POST /inbound/:token` — unique webhook URL per calendar (token in URL authenticates)
+  - Each calendar gets an `inbound_webhook_url` returned at creation and in GET responses
+  - Parses `.ics` attachments from inbound emails using `node-ical`
+  - Creates events with `source: inbound_email`, `status: tentative`
+  - Handles invite updates (reschedules) by matching `ical_uid`
+  - Handles cancellations (`METHOD=CANCEL`)
+  - `organiser_email` and `ical_uid` now included in event API responses
+  - **Multi-provider support**: Postmark (inline base64 attachments) and AgentMail (attachment fetch via API)
+  - Per-calendar `agentmail_api_key` for AgentMail attachment downloads (set via POST/PATCH /calendars)
+  - Fallback: parses iCal data from email text body if no `.ics` attachment found
+- Integration test suite (`tests/api.test.js`) using Node.js built-in `node:test` runner
 
 ### Changed
 - Renamed project from `myapp` to `caldave`

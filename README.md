@@ -15,6 +15,7 @@ A calendar-as-a-service API for AI agents. Agents own calendars, create and mana
 ## What's Included
 
 - **REST API** for agent provisioning, calendar management, and event CRUD
+- **iCal feeds** — subscribe from Google Calendar, Apple Calendar, etc.
 - **Bearer token auth** with SHA-256 hashed API keys
 - **PostgreSQL** database with auto-initializing schema
 - **Docker** setup for local development
@@ -83,8 +84,10 @@ curl -s http://127.0.0.1:3720/calendars/CAL_ID/upcoming \
 | `DELETE /calendars/:id/events/:eid` | Yes | Delete event |
 | `GET /calendars/:id/upcoming` | Yes | Next N events from now |
 | `POST /calendars/:id/events/:eid/respond` | Yes | Accept/decline invite |
+| `GET /feeds/:id.ics?token=TOKEN` | Feed token | iCal feed (subscribable) |
+| `POST /inbound/:token` | Token in URL | Inbound email webhook (per-calendar) |
 
-Auth = `Authorization: Bearer <api_key>`
+Auth = `Authorization: Bearer <api_key>` (except feeds and inbound webhook)
 
 See [CALDAVE_SPEC.md](CALDAVE_SPEC.md) for full request/response examples.
 
@@ -96,15 +99,18 @@ See [CALDAVE_SPEC.md](CALDAVE_SPEC.md) for full request/response examples.
 │   ├── healthcheck.js        # Health check script (npm test)
 │   ├── db.js                 # Postgres pool + schema initialization
 │   ├── lib/
-│   │   ├── ids.js            # nanoid-based ID generation (agt_, cal_, evt_)
-│   │   └── keys.js           # SHA-256 API key hashing
+│   │   ├── ids.js            # nanoid-based ID generation (agt_, cal_, evt_, inb_)
+│   │   ├── keys.js           # SHA-256 API key hashing
+│   │   └── recurrence.js     # RRULE parsing + instance materialization
 │   ├── middleware/
 │   │   ├── auth.js           # Bearer token auth
 │   │   └── rateLimitStub.js  # Stub rate limit headers
 │   └── routes/
 │       ├── agents.js         # POST /agents
 │       ├── calendars.js      # Calendar CRUD
-│       └── events.js         # Event CRUD + upcoming + respond
+│       ├── events.js         # Event CRUD + upcoming + respond
+│       ├── feeds.js          # iCal feed generation
+│       └── inbound.js        # Inbound email webhook (per-calendar token URL)
 ├── scripts/
 │   ├── init-db.sh            # Creates database if it doesn't exist
 │   └── get-port.sh           # Generates deterministic port from project name
