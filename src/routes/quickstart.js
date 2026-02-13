@@ -72,6 +72,10 @@ router.get('/', (req, res) => {
     <h1>Quick Start <a href="/">← Home</a></h1>
     <p class="subtitle">Set up your agent and calendar, then start adding events. Looking for field names and parameters? <a href="/docs" style="color:#60a5fa">Full API reference →</a></p>
 
+    <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.625rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.8125rem; color:#fbbf24;">
+      <strong>AI agents:</strong> Use <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl</code> or HTTP requests instead of browsing this page. Run <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl -s -X POST https://${DOMAIN}/man?guide</code> for a machine-readable guide.
+    </div>
+
     <!-- ===== STEP 1: Create Agent ===== -->
     <div class="step active" id="step1">
       <div class="step-header">

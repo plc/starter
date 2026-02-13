@@ -70,6 +70,10 @@ router.get('/', (req, res) => {
     <h1>CalDave API <a href="/">← Status</a></h1>
     <p class="subtitle">Calendar-as-a-service for AI agents. Base URL: <code class="inline-code">https://${DOMAIN}</code></p>
 
+    <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.75rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.875rem; color:#fbbf24;">
+      <strong>AI agents:</strong> This is a REST API. Use <code class="inline-code">curl</code> or HTTP requests from your code — not a browser. Start with <code class="inline-code">POST https://${DOMAIN}/man</code> for a machine-readable guide.
+    </div>
+
     <div class="toc">
       <h2>Endpoints</h2>
       <div class="section">Auth</div>
