@@ -16,17 +16,12 @@ CalDave is a calendar-as-a-service API for AI agents. The stack is Node.js + Exp
 
 ## QA Testing
 
-Use these credentials to test the API after making changes. The server must be running locally.
+Use the credentials in `.env.test` (not committed) to test the API after making changes. The server must be running locally.
 
-```
-Agent ID:    agt_t305j58pF6dj
-API Key:     $CALDAVE_API_KEY
-Calendar ID: cal_t4IXi3cnVzDL
-Email:       cal-t4IXi3cnVzDL@caldave.ai
-```
-
-Quick smoke test:
 ```bash
+# Load credentials
+source .env.test
+
 # Health check
 curl -s http://127.0.0.1:3720/health
 
@@ -35,13 +30,13 @@ curl -s http://127.0.0.1:3720/calendars \
   -H "Authorization: Bearer $CALDAVE_API_KEY"
 
 # Create a test event
-curl -s -X POST http://127.0.0.1:3720/calendars/cal_t4IXi3cnVzDL/events \
+curl -s -X POST http://127.0.0.1:3720/calendars/$CALDAVE_CALENDAR_ID/events \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $CALDAVE_API_KEY" \
   -d '{"title": "QA test", "start": "2099-01-01T00:00:00Z", "end": "2099-01-01T01:00:00Z"}'
 
 # Check upcoming
-curl -s http://127.0.0.1:3720/calendars/cal_t4IXi3cnVzDL/upcoming \
+curl -s http://127.0.0.1:3720/calendars/$CALDAVE_CALENDAR_ID/upcoming \
   -H "Authorization: Bearer $CALDAVE_API_KEY"
 ```
 
