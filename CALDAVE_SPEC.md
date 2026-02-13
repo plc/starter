@@ -99,6 +99,34 @@ Creates a new agent identity. No auth required (or protected by an operator-leve
 
 ---
 
+### API Manual
+
+#### `POST /man`
+Machine-readable API manual. Returns a JSON document describing all CalDave endpoints with curl examples, parameter definitions, and example responses.
+
+Auth is optional. If a valid Bearer token is provided, the response includes the agent's real calendar IDs and event counts, with personalized curl examples and a recommended next step.
+
+**Response:**
+```json
+{
+  "overview": "CalDave is a calendar-as-a-service API...",
+  "base_url": "https://caldave.ai",
+  "your_context": {
+    "authenticated": true,
+    "agent_id": "agt_xxx",
+    "calendars": [{ "id": "cal_xxx", "name": "Work", "event_count": 12 }]
+  },
+  "recommended_next_step": {
+    "action": "Check upcoming events",
+    "endpoint": "GET /calendars/:id/upcoming",
+    "curl": "curl -s https://caldave.ai/calendars/cal_xxx/upcoming ..."
+  },
+  "endpoints": [{ "method": "POST", "path": "/agents", "description": "...", "auth": "none", "parameters": [], "example_curl": "...", "example_response": {} }]
+}
+```
+
+---
+
 ### Calendar Management
 
 #### `POST /calendars`

@@ -28,6 +28,7 @@ fly deploy
 | `GET /health` | No | Server health check |
 | `GET /health/db` | No | Database health check |
 | `POST /agents` | No | Create agent (returns API key) |
+| `POST /man` | Optional | Machine-readable API manual (JSON), personalized if authenticated |
 | `POST /calendars` | Yes | Create calendar |
 | `GET /calendars` | Yes | List agent's calendars |
 | `GET /calendars/:id` | Yes | Get calendar details |
@@ -61,6 +62,7 @@ src/
 │   └── rateLimitStub.js  — Stub rate limit headers
 └── routes/
     ├── agents.js         — POST /agents
+    ├── man.js            — POST /man (machine-readable API manual)
     ├── calendars.js      — Calendar CRUD
     ├── events.js         — Event CRUD + upcoming + respond
     ├── feeds.js          — iCal feed generation

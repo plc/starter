@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Machine-readable API manual** (`POST /man`) — JSON endpoint describing all CalDave API endpoints, with optional Bearer auth for personalized context. Returns real calendar IDs, event counts, and recommended next steps for authenticated agents. Designed for AI agent consumption.
 - **CalDave v1 core API** — calendar-as-a-service for AI agents
 - Agent provisioning (`POST /agents`) with API key generation (nanoid + SHA-256 hash)
 - Bearer token authentication middleware

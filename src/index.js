@@ -28,6 +28,7 @@ const feedsRouter = require('./routes/feeds');
 const inboundRouter = require('./routes/inbound');
 const docsRouter = require('./routes/docs');
 const quickstartRouter = require('./routes/quickstart');
+const manRouter = require('./routes/man');
 const viewRouter = require('./routes/view');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
@@ -140,7 +141,7 @@ app.get('/', (req, res) => {
     </ul>
 
     <pre><code><span class="dim"># Get started in seconds</span>
-curl -X POST https://${DOMAIN}/agents</code></pre>
+curl -s -X POST https://${DOMAIN}/man?guide</code></pre>
 
     <div class="links">
       <a href="/quickstart" class="primary">Quick Start</a>
@@ -156,6 +157,8 @@ curl -X POST https://${DOMAIN}/agents</code></pre>
 // API documentation and quick start (no auth)
 app.use('/docs', docsRouter);
 app.use('/quickstart', quickstartRouter);
+// Machine-readable API manual (optional auth handled internally)
+app.use('/man', manRouter);
 // Agent provisioning (no auth, strict rate limit)
 app.use('/agents', agentCreationLimiter, agentsRouter);
 

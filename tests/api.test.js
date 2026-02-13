@@ -1234,7 +1234,118 @@ describe('Error log — agent scoping', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 22. Cleanup
+// 22. POST /man — API manual
+// ---------------------------------------------------------------------------
+
+describe('POST /man', { concurrency: 1 }, () => {
+  it('returns full manual without auth', async () => {
+    const { status, data } = await api('POST', '/man');
+    assert.equal(status, 200);
+    assert.ok(data.overview);
+    assert.ok(data.base_url);
+    assert.equal(data.your_context.authenticated, false);
+    assert.equal(data.your_context.agent_id, null);
+    assert.deepEqual(data.your_context.calendars, []);
+    assert.ok(Array.isArray(data.endpoints));
+    assert.ok(data.endpoints.length >= 15, `Expected 15+ endpoints, got ${data.endpoints.length}`);
+    // Recommended next step should be to create an agent
+    assert.equal(data.recommended_next_step.endpoint, 'POST /agents');
+    assert.ok(data.recommended_next_step.curl.includes('/agents'));
+  });
+
+  it('returns personalized context with auth', async () => {
+    const { status, data } = await api('POST', '/man', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.your_context.authenticated, true);
+    assert.equal(data.your_context.agent_id, state.agentId);
+    assert.ok(Array.isArray(data.your_context.calendars));
+  });
+
+  it('uses real calendar IDs in curl examples when authenticated', async () => {
+    const { data } = await api('POST', '/man', { token: state.apiKey });
+
+    // Agent should have at least one calendar from earlier tests
+    assert.ok(data.your_context.calendars.length > 0, 'Should have calendars in context');
+    const firstCalId = data.your_context.calendars[0].id;
+
+    // Curl examples for calendar-specific endpoints should use a real ID
+    const getCalEp = data.endpoints.find(ep => ep.method === 'GET' && ep.path === '/calendars/:id');
+    assert.ok(getCalEp);
+    assert.ok(getCalEp.example_curl.includes(firstCalId), `Curl should contain real calendar ID ${firstCalId}`);
+
+    // Every calendar in context should have expected fields
+    for (const cal of data.your_context.calendars) {
+      assert.ok(cal.id);
+      assert.ok(cal.name);
+      assert.equal(typeof cal.event_count, 'number');
+    }
+  });
+
+  it('invalid token falls back to unauthenticated', async () => {
+    const { status, data } = await api('POST', '/man', { token: 'sk_live_invalid_key_xyz' });
+    assert.equal(status, 200);
+    assert.equal(data.your_context.authenticated, false);
+  });
+
+  it('?guide returns compact response without endpoints', async () => {
+    const { status, data } = await api('POST', '/man?guide');
+    assert.equal(status, 200);
+    assert.ok(data.overview);
+    assert.ok(data.base_url);
+    assert.ok(data.your_context);
+    assert.ok(data.recommended_next_step);
+    assert.equal(data.endpoints, undefined, 'Guide mode should not include endpoints');
+  });
+
+  it('?guide with auth returns personalized context', async () => {
+    const { status, data } = await api('POST', '/man?guide', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.your_context.authenticated, true);
+    assert.equal(data.your_context.agent_id, state.agentId);
+    assert.equal(data.endpoints, undefined);
+  });
+
+  it('every endpoint entry has required fields', async () => {
+    const { data } = await api('POST', '/man');
+    for (const ep of data.endpoints) {
+      assert.ok(ep.method, `Endpoint missing method: ${JSON.stringify(ep)}`);
+      assert.ok(ep.path, `Endpoint missing path: ${JSON.stringify(ep)}`);
+      assert.ok(ep.description, `Endpoint missing description: ${ep.path}`);
+      assert.ok(ep.auth !== undefined, `Endpoint missing auth: ${ep.path}`);
+      assert.ok(Array.isArray(ep.parameters), `Endpoint missing parameters array: ${ep.path}`);
+      assert.ok(ep.example_curl, `Endpoint missing example_curl: ${ep.path}`);
+    }
+  });
+
+  it('recommendation changes based on agent state', async () => {
+    // Create a fresh agent with no calendars
+    const { data: fresh } = await api('POST', '/agents');
+    const { data: noCalData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    assert.equal(noCalData.recommended_next_step.endpoint, 'POST /calendars');
+
+    // Give it a calendar
+    const { data: cal } = await api('POST', '/calendars', {
+      token: fresh.api_key,
+      body: { name: 'Rec Test' },
+    });
+    const { data: noEvtData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    assert.equal(noEvtData.recommended_next_step.endpoint, 'POST /calendars/:id/events');
+
+    // Give it an event
+    await api('POST', `/calendars/${cal.calendar_id}/events`, {
+      token: fresh.api_key,
+      body: { title: 'Test', start: futureDate(1), end: futureDate(2) },
+    });
+    const { data: hasEvtData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    assert.equal(hasEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
+
+    // Clean up
+    await api('DELETE', `/calendars/${cal.calendar_id}`, { token: fresh.api_key });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 23. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {
