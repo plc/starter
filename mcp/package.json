@@ -1,0 +1,19 @@
+{
+  "name": "caldave-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for CalDave — calendar-as-a-service for AI agents",
+  "type": "module",
+  "bin": {
+    "caldave-mcp": "index.mjs"
+  },
+  "main": "index.mjs",
+  "keywords": ["mcp", "calendar", "ai-agents", "caldave"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

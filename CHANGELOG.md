@@ -6,7 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Inbound REQUEST after CANCEL** — when an organiser moves or re-sends an invite that was previously cancelled, the event is now un-cancelled (recurring events reset to `recurring` with rematerialized instances; non-recurring events reset to `tentative`)
+- **Calendar email domain** — calendar emails now correctly use `@invite.caldave.ai` (Postmark inbound domain) instead of `@caldave.ai`
+
 ### Added
+- **`caldave-mcp` npm package** — standalone MCP server published as `caldave-mcp` on npm. Run with `npx caldave-mcp` with `CALDAVE_API_KEY` set.
 - **MCP server instructions** — the MCP server now sends a detailed `instructions` string during initialization, giving AI agents full context about CalDave's workflow, inbound email, recurring events, metadata, and tool usage guidance
 - **Machine-readable API manual** (`POST /man`) — JSON endpoint describing all CalDave API endpoints, with optional Bearer auth for personalized context. Returns real calendar IDs, event counts, and recommended next steps for authenticated agents. Designed for AI agent consumption.
 - **CalDave v1 core API** — calendar-as-a-service for AI agents

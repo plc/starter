@@ -14,6 +14,7 @@ const { logError } = require('../lib/errors');
 
 const router = Router();
 const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
+const EMAIL_DOMAIN = process.env.CALDAVE_EMAIL_DOMAIN || 'invite.caldave.ai';
 const BASE = `https://${DOMAIN}`;
 
 // ---------------------------------------------------------------------------
@@ -117,7 +118,7 @@ function getEndpoints() {
         calendar_id: 'cal_a1b2c3XyZ',
         name: 'Work Schedule',
         timezone: 'America/Denver',
-        email: `cal-a1b2c3XyZ@${DOMAIN}`,
+        email: `cal-a1b2c3XyZ@${EMAIL_DOMAIN}`,
         ical_feed_url: `${BASE}/feeds/cal_a1b2c3XyZ.ics?token=feed_...`,
         inbound_webhook_url: `${BASE}/inbound/inb_...`,
       },

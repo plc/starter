@@ -17,8 +17,10 @@ const { logError } = require('../lib/errors');
 
 const router = Router();
 
-// Domain used for generated email addresses
+// Domain used for URLs (feed links, webhook URLs, etc.)
 const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
+// Domain used for calendar email addresses (Postmark inbound domain)
+const EMAIL_DOMAIN = process.env.CALDAVE_EMAIL_DOMAIN || 'invite.caldave.ai';
 
 /**
  * Helper: fetch a calendar and verify the authenticated agent owns it.
@@ -72,7 +74,7 @@ router.post('/', async (req, res) => {
     const id = calendarId();
     const token = feedToken();
     const inbToken = inboundToken();
-    const email = `cal-${id.slice(4)}@${DOMAIN}`;
+    const email = `cal-${id.slice(4)}@${EMAIL_DOMAIN}`;
     const tz = timezone || 'UTC';
 
     await pool.query(

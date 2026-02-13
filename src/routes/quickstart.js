@@ -9,6 +9,7 @@ const { Router } = require('express');
 const router = Router();
 
 const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
+const EMAIL_DOMAIN = process.env.CALDAVE_EMAIL_DOMAIN || 'invite.caldave.ai';
 
 router.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
@@ -254,7 +255,7 @@ router.get('/', (req, res) => {
 
       // Build email address for email tab
       var emailId = calId.indexOf('cal_') === 0 ? calId.slice(4) : calId;
-      document.getElementById('cal-email').textContent = 'cal-' + emailId + '@${DOMAIN}';
+      document.getElementById('cal-email').textContent = 'cal-' + emailId + '@${EMAIL_DOMAIN}';
     }
   </script>
 </body>

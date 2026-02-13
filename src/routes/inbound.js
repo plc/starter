@@ -366,16 +366,20 @@ async function processInboundEmail(calendar, body, res) {
           new Date(evt.end_time).getTime() !== new Date(end).getTime();
         const recurrenceChanged = (evt.recurrence || null) !== (recurrence || null);
 
+        // If the event was previously cancelled but we're getting a new REQUEST,
+        // un-cancel it (the organiser re-invited or moved the event).
+        const wasCancelled = evt.status === 'cancelled';
+
         if (evt.recurrence || recurrence) {
           // --- Recurring event update ---
-          // Reset to 'recurring' status if times/rrule changed (needs rematerialization)
-          const needsRematerialize = timesChanged || recurrenceChanged;
+          const needsRematerialize = timesChanged || recurrenceChanged || wasCancelled;
 
           await pool.query(
             `UPDATE events SET
                title = $1, start_time = $2, end_time = $3,
                location = $4, description = $5, attendees = $6,
-               organiser_email = $7, recurrence = $8, updated_at = now()
+               organiser_email = $7, recurrence = $8, status = 'recurring',
+               updated_at = now()
              WHERE id = $9`,
             [
               title,
@@ -403,8 +407,8 @@ async function processInboundEmail(calendar, body, res) {
         }
 
         // --- Non-recurring event update ---
-        // Reset to tentative if times changed (agent needs to re-confirm)
-        const newStatus = timesChanged ? 'tentative' : evt.status;
+        // Reset to tentative if times changed or event was cancelled (agent needs to re-confirm)
+        const newStatus = (timesChanged || wasCancelled) ? 'tentative' : evt.status;
 
         await pool.query(
           `UPDATE events SET

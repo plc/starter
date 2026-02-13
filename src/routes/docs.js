@@ -9,6 +9,7 @@ const { Router } = require('express');
 const router = Router();
 
 const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
+const EMAIL_DOMAIN = process.env.CALDAVE_EMAIL_DOMAIN || 'invite.caldave.ai';
 
 router.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
@@ -153,11 +154,11 @@ router.get('/', (req, res) => {
   "calendar_id": "cal_a1b2c3XyZ",
   "name": "Work Schedule",
   "timezone": "America/Denver",
-  "email": "cal-a1b2c3XyZ@${DOMAIN}",
+  "email": "cal-a1b2c3XyZ@${EMAIL_DOMAIN}",
   "ical_feed_url": "https://${DOMAIN}/feeds/cal_a1b2c3XyZ.ics?token=feed_...",
   "feed_token": "feed_...",
   "inbound_webhook_url": "https://${DOMAIN}/inbound/inb_...",
-  "message": "This calendar can receive invites at cal-a1b2c3XyZ@${DOMAIN}. ..."
+  "message": "This calendar can receive invites at cal-a1b2c3XyZ@${EMAIL_DOMAIN}. ..."
 }</code></pre>
     </div>
 

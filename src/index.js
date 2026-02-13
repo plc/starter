@@ -144,8 +144,7 @@ app.get('/', (req, res) => {
 curl -s -X POST https://${DOMAIN}/man?guide</code></pre>
 
     <div class="links">
-      <a href="/quickstart" class="primary">Quick Start</a>
-      <a href="/docs" class="secondary">API Docs</a>
+      <a href="/docs" class="primary">API Docs</a>
     </div>
   </div>
 </body>

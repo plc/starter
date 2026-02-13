@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * CalDave MCP Server
  *
