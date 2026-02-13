@@ -96,9 +96,28 @@ function msToIsoDuration(ms) {
 /**
  * POST /calendars/:id/events
  */
+const KNOWN_EVENT_FIELDS = new Set([
+  'title', 'start', 'end', 'description', 'metadata', 'location',
+  'status', 'attendees', 'recurrence',
+]);
+
+/**
+ * Check for unknown fields in the request body. Returns an error message
+ * listing the unknown fields, or null if all fields are known.
+ */
+function checkUnknownFields(body, knownFields) {
+  if (!body || typeof body !== 'object') return null;
+  const unknown = Object.keys(body).filter(k => !knownFields.has(k));
+  if (unknown.length === 0) return null;
+  return `Unknown field${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}`;
+}
+
 router.post('/:id/events', async (req, res) => {
   try {
     if (!(await verifyCalendarOwnership(req, res))) return;
+
+    const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
+    if (unknownErr) return res.status(400).json({ error: unknownErr });
 
     const { title, start, end, description, metadata, location, status, attendees, recurrence } = req.body;
 
@@ -316,6 +335,10 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     }
 
     const evt = check.rows[0];
+
+    const unknownErr = checkUnknownFields(req.body, KNOWN_EVENT_FIELDS);
+    if (unknownErr) return res.status(400).json({ error: unknownErr });
+
     const { title, description, metadata, start, end, location, status, attendees, recurrence } = req.body;
 
     // Length checks

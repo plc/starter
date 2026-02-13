@@ -54,11 +54,26 @@ function formatCalendar(cal) {
   };
 }
 
+const KNOWN_CALENDAR_POST_FIELDS = new Set(['name', 'timezone', 'agentmail_api_key']);
+const KNOWN_CALENDAR_PATCH_FIELDS = new Set([
+  'name', 'timezone', 'webhook_url', 'webhook_secret', 'webhook_offsets', 'agentmail_api_key',
+]);
+
+function checkUnknownFields(body, knownFields) {
+  if (!body || typeof body !== 'object') return null;
+  const unknown = Object.keys(body).filter(k => !knownFields.has(k));
+  if (unknown.length === 0) return null;
+  return `Unknown field${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}`;
+}
+
 /**
  * POST /calendars
  */
 router.post('/', async (req, res) => {
   try {
+    const unknownErr = checkUnknownFields(req.body, KNOWN_CALENDAR_POST_FIELDS);
+    if (unknownErr) return res.status(400).json({ error: unknownErr });
+
     const { name, timezone, agentmail_api_key } = req.body;
 
     if (!name) {
@@ -137,6 +152,9 @@ router.patch('/:id', async (req, res) => {
   try {
     const cal = await getOwnedCalendar(req, res);
     if (!cal) return;
+
+    const unknownErr = checkUnknownFields(req.body, KNOWN_CALENDAR_PATCH_FIELDS);
+    if (unknownErr) return res.status(400).json({ error: unknownErr });
 
     const { name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key } = req.body;
 
