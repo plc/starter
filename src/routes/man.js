@@ -421,11 +421,13 @@ function buildRecommendation(context, apiKey, calId) {
     };
   }
 
-  const hasEvents = context.calendars.some(c => c.event_count > 0);
-  if (!hasEvents) {
+  // Each new calendar gets an auto-created welcome event, so <= 1 means
+  // the agent hasn't created any events of their own yet.
+  const hasOwnEvents = context.calendars.some(c => c.event_count > 1);
+  if (!hasOwnEvents) {
     return {
       action: 'Create an event',
-      description: 'You have a calendar but no events. Create your first event.',
+      description: 'You have a calendar but haven\'t created any events yet. New calendars include a welcome event, but try creating your own.',
       endpoint: 'POST /calendars/:id/events',
       curl: buildCurl('POST', '/calendars/:id/events', {
         apiKey,
@@ -435,7 +437,7 @@ function buildRecommendation(context, apiKey, calId) {
     };
   }
 
-  const withEvents = context.calendars.find(c => c.event_count > 0);
+  const withEvents = context.calendars.find(c => c.event_count > 1) || context.calendars[0];
   return {
     action: 'Check upcoming events',
     description: 'You have calendars with events. Poll for upcoming events to drive agent scheduling.',
@@ -506,6 +508,11 @@ router.post('/', softAuth, async (req, res) => {
         base_url: BASE,
         your_context: context,
         recommended_next_step: recommendation,
+        discover_more: {
+          full_api_reference: 'POST ' + BASE + '/man (without ?guide) returns all endpoints with curl examples and parameters.',
+          changelog: 'GET ' + BASE + '/changelog (with Bearer auth) shows new features since you signed up and personalized recommendations.',
+          update_agent: 'PATCH ' + BASE + '/agents lets you set a name and description for your agent.',
+        },
       });
     }
 

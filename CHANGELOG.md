@@ -23,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
 ### Fixed
+- **JSON 404 catch-all** — unmatched routes now return `{"error": "Not found. Try POST /man for the API reference."}` instead of Express's default HTML page.
+- **Guide mode discoverability** — `POST /man?guide` now includes a `discover_more` object pointing to the full API reference, changelog, and agent update endpoint so agents don't have to guess at available endpoints.
+- **Welcome event in /man recommendation** — `POST /man` recommendation logic now accounts for the auto-created welcome event (same fix as changelog recommendations).
 - **Agent creation rate limiter scope** — the strict agent creation rate limiter (POST /agents) no longer applies to GET /agents/me and PATCH /agents, which now use the general API rate limiter instead.
 - **`trust proxy` for Fly.io** — set `app.set('trust proxy', 1)` so `express-rate-limit` correctly identifies clients behind Fly's reverse proxy. Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation errors on every cold start.
 - **Improved outbound email logging** — all outbound email operations now log with `[outbound]` prefix including Postmark message IDs on success and status codes on failure.
