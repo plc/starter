@@ -344,7 +344,7 @@ function getEndpoints() {
         { name: 'response', in: 'body', required: true, type: 'string', description: 'accepted, declined, or tentative' },
       ],
       example_body: { response: 'accepted' },
-      example_response: { id: 'evt_...', status: 'confirmed', response_sent: 'accepted' },
+      example_response: { id: 'evt_...', status: 'confirmed', response: 'accepted', email_sent: true },
     },
     {
       method: 'GET',

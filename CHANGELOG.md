@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
 ### Fixed
+- **Docs placeholder standardization** — all curl examples in `/docs` now use consistent `UPPER_SNAKE_CASE` placeholders (`YOUR_API_KEY`, `CAL_ID`, `EVT_ID`, `FEED_TOKEN`) with gold highlighting. Added placeholder legend, error endpoints (`GET /errors`, `GET /errors/:id`), and fixed agent description max length (1024, not 1000). Fixed `POST /man` respond example (`email_sent` field, not `response_sent`).
 - **API docs updated** — `/docs` page now documents `GET /agents/me`, `PATCH /agents`, agent `name`/`description` fields on `POST /agents`, `GET /changelog`, and `POST /man`. Table of contents updated with Agents and Discovery sections.
 - **JSON 404 catch-all** — unmatched routes now return `{"error": "Not found. Try POST /man for the API reference."}` instead of Express's default HTML page.
 - **Guide mode discoverability** — `POST /man?guide` now includes a `discover_more` object pointing to the full API reference, changelog, and agent update endpoint so agents don't have to guess at available endpoints.

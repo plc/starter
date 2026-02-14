@@ -43,6 +43,7 @@ router.get('/', (req, res) => {
     pre { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; overflow-x: auto; margin-bottom: 0.75rem; position: relative; }
     code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8125rem; color: #e2e8f0; }
     .inline-code { background: #334155; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.8125rem; }
+    .placeholder { color: #fbbf24; font-style: italic; }
     .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.375rem; }
     .params { margin-bottom: 1rem; }
     .param { display: flex; gap: 0.75rem; padding: 0.375rem 0; border-bottom: 1px solid #1e293b; font-size: 0.875rem; }
@@ -110,6 +111,11 @@ router.get('/', (req, res) => {
         <li><a href="#get-feed">GET /feeds/:id.ics</a> — iCal feed</li>
         <li><a href="#post-inbound">POST /inbound/:token</a> — Inbound email webhook</li>
       </ul>
+      <div class="section">Debugging</div>
+      <ul>
+        <li><a href="#get-errors">GET /errors</a> — List recent errors</li>
+        <li><a href="#get-error">GET /errors/:id</a> — Get error detail</li>
+      </ul>
       <div class="section">Discovery</div>
       <ul>
         <li><a href="#get-changelog">GET /changelog</a> — API changelog</li>
@@ -120,8 +126,9 @@ router.get('/', (req, res) => {
     <!-- ============================================================ -->
     <h2 id="auth">Authentication</h2>
     <p>Most endpoints require a Bearer token. Include it in every request:</p>
-    <pre><code>Authorization: Bearer sk_live_your_api_key_here</code></pre>
+    <pre><code>Authorization: Bearer YOUR_API_KEY</code></pre>
     <p>Exceptions: <code class="inline-code">POST /agents</code> (no auth), <code class="inline-code">GET /feeds</code> (token in query param), and <code class="inline-code">POST /inbound</code> (token in URL path).</p>
+    <p style="margin-top:1rem; font-size:0.8125rem; color:#64748b;">In curl examples below, <code class="inline-code" style="color:#fbbf24;">YOUR_API_KEY</code>, <code class="inline-code" style="color:#fbbf24;">CAL_ID</code>, <code class="inline-code" style="color:#fbbf24;">EVT_ID</code>, and <code class="inline-code" style="color:#fbbf24;">FEED_TOKEN</code> are placeholders — replace them with your real values.</p>
 
     <!-- ============================================================ -->
     <h2 id="agents">Agents</h2>
@@ -136,7 +143,7 @@ router.get('/', (req, res) => {
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">name <span class="param-opt">optional</span></span><span class="param-desc">Display name for the agent (max 255 chars). Shown in outbound email From headers.</span></div>
-        <div class="param"><span class="param-name">description <span class="param-opt">optional</span></span><span class="param-desc">What the agent does (max 1000 chars). Surfaced in POST /man context.</span></div>
+        <div class="param"><span class="param-name">description <span class="param-opt">optional</span></span><span class="param-desc">What the agent does (max 1024 chars). Surfaced in POST /man context.</span></div>
       </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
@@ -181,7 +188,7 @@ router.get('/', (req, res) => {
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">name</span><span class="param-desc">Display name (max 255 chars)</span></div>
-        <div class="param"><span class="param-name">description</span><span class="param-desc">What the agent does (max 1000 chars)</span></div>
+        <div class="param"><span class="param-name">description</span><span class="param-desc">What the agent does (max 1024 chars)</span></div>
       </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X PATCH https://${DOMAIN}/agents \\
@@ -252,7 +259,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Get a single calendar by ID.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/cal_a1b2c3XyZ \\
+      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -273,7 +280,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">agentmail_api_key</span><span class="param-desc">AgentMail API key for this calendar</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/cal_a1b2c3XyZ \\
+      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"name": "Updated Name", "timezone": "America/New_York"}'</code></pre>
@@ -287,7 +294,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Delete a calendar and all its events. Returns 204 on success.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s -X DELETE https://${DOMAIN}/calendars/cal_a1b2c3XyZ \\
+      <pre><code>curl -s -X DELETE https://${DOMAIN}/calendars/CAL_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -377,7 +384,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Get a single event by ID.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/events/evt_abc123 \\
+      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -402,7 +409,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">recurrence</span><span class="param-desc">Updated RRULE (parent only — triggers rematerialization). Alias: <code class="inline-code">rrule</code></span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID/events/evt_abc123 \\
+      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"title": "Updated title", "location": "Room 42"}'</code></pre>
@@ -420,7 +427,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">mode</span><span class="param-desc"><code class="inline-code">single</code> — cancel this instance only (default)<br><code class="inline-code">future</code> — cancel this and all future instances<br><code class="inline-code">all</code> — delete entire series</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X DELETE "https://${DOMAIN}/calendars/CAL_ID/events/evt_abc123?mode=single" \\
+      <pre><code>curl -s -X DELETE "https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID?mode=single" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -482,7 +489,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <div class="param"><span class="param-name">response <span class="param-req">required</span></span><span class="param-desc">accepted, declined, or tentative</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events/evt_abc123/respond \\
+      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID/respond \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"response": "accepted"}'</code></pre>
@@ -499,7 +506,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
       </div>
       <p class="desc">Read-only iCalendar feed. Subscribe to this URL from Google Calendar, Apple Calendar, or any iCal-compatible app. The <code class="inline-code">feed_token</code> is returned when you create a calendar.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s "https://${DOMAIN}/feeds/cal_a1b2c3XyZ.ics?token=feed_xyz789"</code></pre>
+      <pre><code>curl -s "https://${DOMAIN}/feeds/CAL_ID.ics?token=FEED_TOKEN"</code></pre>
       <div class="note">Add this URL to Google Calendar via "Other calendars" → "From URL". Events appear as read-only.</div>
     </div>
 
@@ -523,10 +530,42 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <strong>AgentMail:</strong> Set the webhook URL in AgentMail's inbox settings. CalDave fetches .ics attachments via the AgentMail API using the calendar's <code class="inline-code">agentmail_api_key</code>.
       </div>
       <div class="label">Response (always 200)</div>
-      <pre><code>{ "status": "created", "event_id": "evt_xxx" }
-{ "status": "updated", "event_id": "evt_xxx" }
-{ "status": "cancelled", "event_id": "evt_xxx" }
+      <pre><code>{ "status": "created", "event_id": "evt_..." }
+{ "status": "updated", "event_id": "evt_..." }
+{ "status": "cancelled", "event_id": "evt_..." }
 { "status": "ignored", "reason": "..." }</code></pre>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="debugging">Debugging</h2>
+
+    <div class="endpoint" id="get-errors">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/errors</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">List recent API errors scoped to your agent. Useful for debugging failed requests.</p>
+      <div class="label">Query parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">limit</span><span class="param-desc">Max results (default 50, max 200)</span></div>
+        <div class="param"><span class="param-name">route</span><span class="param-desc">Filter by route pattern</span></div>
+      </div>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/errors \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+    </div>
+
+    <div class="endpoint" id="get-error">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/errors/:id</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Get a single error with full stack trace.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/errors/42 \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
     <!-- ============================================================ -->
@@ -588,7 +627,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
       <p class="response-note">Save the calendar_id, email, and feed URLs from the response.</p>
 
       <div class="label" style="margin-top: 1rem;">3. Create an event</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/YOUR_CAL_ID/events \\
+      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
@@ -607,16 +646,25 @@ Daily standup  2026-02-13 16:00:00Z  ...
 
   <script>
     // Add copy buttons to code blocks
-    document.querySelectorAll('pre').forEach(pre => {
-      const btn = document.createElement('button');
+    document.querySelectorAll('pre').forEach(function(pre) {
+      var btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.textContent = 'Copy';
-      btn.onclick = () => {
+      btn.onclick = function() {
         navigator.clipboard.writeText(pre.querySelector('code').textContent);
         btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 1500);
+        setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
       };
       pre.appendChild(btn);
+    });
+    // Highlight placeholders in code blocks
+    var placeholders = ['YOUR_API_KEY', 'CAL_ID', 'EVT_ID', 'FEED_TOKEN'];
+    document.querySelectorAll('pre code').forEach(function(code) {
+      var html = code.innerHTML;
+      placeholders.forEach(function(ph) {
+        html = html.split(ph).join('<span class="placeholder">' + ph + '</span>');
+      });
+      code.innerHTML = html;
     });
   </script>
 </body>
