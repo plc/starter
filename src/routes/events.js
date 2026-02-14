@@ -234,6 +234,12 @@ function normalizeBody(body) {
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+function isValidDatetime(str) {
+  if (typeof str !== 'string') return false;
+  const d = new Date(str);
+  return !isNaN(d.getTime());
+}
+
 /**
  * Normalize start/end for all-day events.
  * Input: inclusive dates like "2025-03-15" (start) and "2025-03-15" (end = same day).
@@ -299,6 +305,13 @@ router.post('/:id/events', async (req, res) => {
         return res.status(400).json({ error: 'start date must not be after end date' });
       }
       ({ startTime, endTime } = normalizeAllDay(start, end));
+    } else {
+      if (!isValidDatetime(start)) {
+        return res.status(400).json({ error: 'start must be a valid ISO 8601 datetime' });
+      }
+      if (!isValidDatetime(end)) {
+        return res.status(400).json({ error: 'end must be a valid ISO 8601 datetime' });
+      }
     }
 
     const id = eventId();
@@ -559,6 +572,13 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       }
       if (DATE_ONLY_RE.test(s) && DATE_ONLY_RE.test(e)) {
         ({ startTime, endTime } = normalizeAllDay(s, e));
+      }
+    } else {
+      if (start !== undefined && !isValidDatetime(start)) {
+        return res.status(400).json({ error: 'start must be a valid ISO 8601 datetime' });
+      }
+      if (end !== undefined && !isValidDatetime(end)) {
+        return res.status(400).json({ error: 'end must be a valid ISO 8601 datetime' });
       }
     }
 

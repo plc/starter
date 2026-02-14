@@ -1174,6 +1174,40 @@ describe('Input validation', { concurrency: 1 }, () => {
     await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
   });
 
+  it('rejects invalid start datetime on POST', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad date', start: 'not-a-date', end: futureDate(2) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('start'));
+  });
+
+  it('rejects invalid end datetime on POST', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad date', start: futureDate(1), end: 'garbage' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('end'));
+  });
+
+  it('rejects invalid start datetime on PATCH', async () => {
+    const { data: created } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Temp', start: futureDate(1), end: futureDate(2) },
+    });
+
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}/events/${created.id}`, {
+      token: state.apiKey,
+      body: { start: 'not-a-date' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('start'));
+
+    await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
   it('rejects FREQ=MINUTELY', async () => {
     const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
       token: state.apiKey,
