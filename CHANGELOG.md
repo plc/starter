@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Webhook test endpoint** — `POST /calendars/:id/webhook/test` sends a test payload to the calendar's configured webhook URL and returns the HTTP status code. Supports HMAC-SHA256 signing via `X-CalDave-Signature` when `webhook_secret` is set.
+- **Welcome event opt-out** — `POST /calendars` now accepts `welcome_event: false` to skip the auto-created welcome event. Default remains true.
+- **Rate limit documentation** — rate limits documented in `/docs` and included in `POST /man` responses. All responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers (RFC draft-7).
+- **Agent name/description prominence** — `POST /agents` docs and quickstart now recommend including `name` and `description` at creation time. `POST /man` recommends naming your agent as the first step for unnamed agents. New `recommended` badge on params.
 - **Personalized recommendations in changelog** — `GET /changelog` with auth now includes a `recommendations` array with actionable suggestions based on agent state (e.g. name your agent, create your first calendar, add a description).
 - **API changelog endpoint** — `GET /changelog` returns a structured list of API changes with dates and docs links. With optional Bearer auth, highlights changes introduced since the agent was created. Designed for agents to poll ~weekly.
 - **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `POST /man` context.

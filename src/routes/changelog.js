@@ -118,6 +118,33 @@ async function buildRecommendations(agent) {
 
 const CHANGELOG = [
   {
+    date: '2026-02-15',
+    version: null,
+    changes: [
+      {
+        type: 'feature',
+        title: 'Webhook test endpoint',
+        description: 'POST /calendars/:id/webhook/test sends a test payload to your configured webhook URL and returns the HTTP status code. Verifies webhook configuration before real events fire. Supports HMAC-SHA256 signing.',
+        endpoints: ['POST /calendars/:id/webhook/test'],
+        docs: BASE + '/docs#post-webhook-test',
+      },
+      {
+        type: 'feature',
+        title: 'Welcome event opt-out',
+        description: 'POST /calendars now accepts welcome_event: false to skip the auto-created welcome event. Defaults to true (event is created).',
+        endpoints: ['POST /calendars'],
+        docs: BASE + '/docs#post-calendars',
+      },
+      {
+        type: 'improvement',
+        title: 'Rate limit documentation',
+        description: 'Rate limits are now documented in /docs and included in POST /man responses. All responses include RateLimit-Limit, RateLimit-Remaining, and RateLimit-Reset headers (RFC draft-7).',
+        endpoints: ['GET /docs', 'POST /man'],
+        docs: BASE + '/docs#auth',
+      },
+    ],
+  },
+  {
     date: '2026-02-14',
     version: null,
     changes: [

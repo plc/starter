@@ -87,7 +87,7 @@ function getEndpoints() {
     {
       method: 'POST',
       path: '/agents',
-      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Optionally include name and description to identify the agent.',
+      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Include name and description — the name appears in outbound email From headers.',
       auth: 'none',
       parameters: [
         { name: 'name', in: 'body', required: false, type: 'string', description: 'Display name for the agent (max 255 chars). Recommended.' },
@@ -166,6 +166,7 @@ function getEndpoints() {
         { name: 'name', in: 'body', required: true, type: 'string', description: 'Calendar display name' },
         { name: 'timezone', in: 'body', required: false, type: 'string', description: 'IANA timezone (default: UTC)' },
         { name: 'agentmail_api_key', in: 'body', required: false, type: 'string', description: 'AgentMail API key for inbound email attachments' },
+        { name: 'welcome_event', in: 'body', required: false, type: 'boolean', description: 'Set to false to skip the auto-created welcome event. Defaults to true.' },
       ],
       example_body: { name: 'Work Schedule', timezone: 'America/Denver' },
       example_response: {
@@ -224,6 +225,17 @@ function getEndpoints() {
       ],
       example_body: null,
       example_response: null,
+    },
+    {
+      method: 'POST',
+      path: '/calendars/:id/webhook/test',
+      description: 'Send a test payload to the calendar webhook URL. Returns the HTTP status code. Verifies webhook configuration before real events fire.',
+      auth: 'bearer',
+      parameters: [
+        { name: 'id', in: 'path', required: true, type: 'string', description: 'Calendar ID' },
+      ],
+      example_body: null,
+      example_response: { success: true, status_code: 200, webhook_url: 'https://...', message: 'Webhook delivered successfully.' },
     },
     {
       method: 'POST',
@@ -409,6 +421,18 @@ function buildRecommendation(context, apiKey, calId) {
     };
   }
 
+  if (!context.agent_name) {
+    return {
+      action: 'Name your agent',
+      description: 'Your agent has no name. Setting a name is recommended — it appears in outbound email From headers and makes your agent easier to identify.',
+      endpoint: 'PATCH /agents',
+      curl: buildCurl('PATCH', '/agents', {
+        apiKey,
+        body: { name: 'My Agent', description: 'Brief description of what this agent does' },
+      }),
+    };
+  }
+
   if (context.calendars.length === 0) {
     return {
       action: 'Create a calendar',
@@ -506,6 +530,7 @@ router.post('/', softAuth, async (req, res) => {
       return res.json({
         overview: 'CalDave is a calendar-as-a-service API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.',
         base_url: BASE,
+        rate_limits: { api: '1000/min', agent_creation: '20/hour', inbound: '60/min' },
         your_context: context,
         recommended_next_step: recommendation,
         discover_more: {
@@ -562,6 +587,12 @@ router.post('/', softAuth, async (req, res) => {
     res.json({
       overview: 'CalDave is a calendar-as-a-service API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.',
       base_url: BASE,
+      rate_limits: {
+        api: '1000 requests/minute per IP',
+        agent_creation: '20 requests/hour per IP',
+        inbound_webhooks: '60 requests/minute per IP',
+        headers: 'RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset (RFC draft-7)',
+      },
       your_context: context,
       recommended_next_step: recommendation,
       endpoints,

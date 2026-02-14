@@ -14,7 +14,7 @@ const skipInTest = () => process.env.NODE_ENV === 'test';
 
 /**
  * General API rate limiter (authenticated routes).
- * 200 requests per minute per IP.
+ * 1000 requests per minute per IP.
  */
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -27,7 +27,7 @@ const apiLimiter = rateLimit({
 
 /**
  * Strict limiter for agent creation (unauthenticated).
- * 5 requests per hour per IP.
+ * 20 requests per hour per IP.
  */
 const agentCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,

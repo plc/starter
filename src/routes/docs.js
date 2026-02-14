@@ -52,6 +52,7 @@ router.get('/', (req, res) => {
     .param-desc { color: #94a3b8; }
     .param-req { color: #f87171; font-size: 0.75rem; }
     .param-opt { color: #64748b; font-size: 0.75rem; }
+    .param-rec { color: #fbbf24; font-size: 0.75rem; }
     .response-note { color: #64748b; font-size: 0.8125rem; font-style: italic; }
     .toc { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
     .toc h2 { margin-top: 0; border-bottom: none; padding-bottom: 0; }
@@ -94,6 +95,7 @@ router.get('/', (req, res) => {
         <li><a href="#get-calendar">GET /calendars/:id</a> — Get calendar</li>
         <li><a href="#patch-calendar">PATCH /calendars/:id</a> — Update calendar</li>
         <li><a href="#delete-calendar">DELETE /calendars/:id</a> — Delete calendar</li>
+        <li><a href="#post-webhook-test">POST /calendars/:id/webhook/test</a> — Test webhook</li>
       </ul>
       <div class="section">Events</div>
       <ul>
@@ -130,6 +132,14 @@ router.get('/', (req, res) => {
     <p>Exceptions: <code class="inline-code">POST /agents</code> (no auth), <code class="inline-code">GET /feeds</code> (token in query param), and <code class="inline-code">POST /inbound</code> (token in URL path).</p>
     <p style="margin-top:1rem; font-size:0.8125rem; color:#64748b;">In curl examples below, <code class="inline-code" style="color:#fbbf24;">YOUR_API_KEY</code>, <code class="inline-code" style="color:#fbbf24;">CAL_ID</code>, <code class="inline-code" style="color:#fbbf24;">EVT_ID</code>, and <code class="inline-code" style="color:#fbbf24;">FEED_TOKEN</code> are placeholders — replace them with your real values.</p>
 
+    <h3 style="margin-top:1.5rem;">Rate Limits</h3>
+    <div class="params" style="margin-bottom:1.5rem;">
+      <div class="param"><span class="param-name" style="min-width:200px;">API endpoints</span><span class="param-desc">1000 requests / minute per IP</span></div>
+      <div class="param"><span class="param-name" style="min-width:200px;">POST /agents</span><span class="param-desc">20 requests / hour per IP</span></div>
+      <div class="param"><span class="param-name" style="min-width:200px;">Inbound webhooks</span><span class="param-desc">60 requests / minute per IP</span></div>
+    </div>
+    <p style="font-size:0.8125rem; color:#64748b;">Responses include <code class="inline-code">RateLimit-Limit</code>, <code class="inline-code">RateLimit-Remaining</code>, and <code class="inline-code">RateLimit-Reset</code> headers (RFC draft-7). When exceeded, you receive a 429 response.</p>
+
     <!-- ============================================================ -->
     <h2 id="agents">Agents</h2>
 
@@ -139,11 +149,11 @@ router.get('/', (req, res) => {
         <span class="path">/agents</span>
         <span class="auth-badge">No auth</span>
       </div>
-      <p class="desc">Create a new agent identity. Returns credentials you must save — the API key is shown once.</p>
+      <p class="desc">Create a new agent identity. Returns credentials you must save — the API key is shown once. Include <code class="inline-code">name</code> and <code class="inline-code">description</code> to identify your agent — the name appears in outbound email From headers.</p>
       <div class="label">Body parameters</div>
       <div class="params">
-        <div class="param"><span class="param-name">name <span class="param-opt">optional</span></span><span class="param-desc">Display name for the agent (max 255 chars). Shown in outbound email From headers.</span></div>
-        <div class="param"><span class="param-name">description <span class="param-opt">optional</span></span><span class="param-desc">What the agent does (max 1024 chars). Surfaced in POST /man context.</span></div>
+        <div class="param"><span class="param-name">name <span class="param-rec">recommended</span></span><span class="param-desc">Display name for the agent (max 255 chars). Appears in outbound email From headers (e.g. "My Agent" &lt;cal-xxx@${EMAIL_DOMAIN}&gt;).</span></div>
+        <div class="param"><span class="param-name">description <span class="param-rec">recommended</span></span><span class="param-desc">What the agent does (max 1024 chars). Surfaced in POST /man personalized context.</span></div>
       </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
@@ -220,6 +230,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">name <span class="param-req">required</span></span><span class="param-desc">Calendar display name</span></div>
         <div class="param"><span class="param-name">timezone <span class="param-opt">optional</span></span><span class="param-desc">IANA timezone (default: UTC)</span></div>
         <div class="param"><span class="param-name">agentmail_api_key <span class="param-opt">optional</span></span><span class="param-desc">AgentMail API key for fetching inbound email attachments</span></div>
+        <div class="param"><span class="param-name">welcome_event <span class="param-opt">optional</span></span><span class="param-desc">Set to <code class="inline-code">false</code> to skip the auto-created welcome event. Defaults to true.</span></div>
       </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X POST https://${DOMAIN}/calendars \\
@@ -296,6 +307,26 @@ router.get('/', (req, res) => {
       <div class="label">Example</div>
       <pre><code>curl -s -X DELETE https://${DOMAIN}/calendars/CAL_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+    </div>
+
+    <div class="endpoint" id="post-webhook-test">
+      <div class="method-path">
+        <span class="method post">POST</span>
+        <span class="path">/calendars/:id/webhook/test</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Send a test payload to the calendar's configured webhook URL. Returns the HTTP status code from the webhook endpoint. Useful for verifying webhook configuration before real events fire.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/webhook/test \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Response</div>
+      <pre><code>{
+  "success": true,
+  "status_code": 200,
+  "webhook_url": "https://example.com/webhook",
+  "message": "Webhook delivered successfully."
+}</code></pre>
+      <div class="note">The test payload includes <code class="inline-code">type: "test"</code> so your webhook handler can distinguish test pings from real events. If <code class="inline-code">webhook_secret</code> is set, the payload is signed with HMAC-SHA256 via the <code class="inline-code">X-CalDave-Signature</code> header.</div>
     </div>
 
     <!-- ============================================================ -->
@@ -616,8 +647,10 @@ Daily standup  2026-02-13 16:00:00Z  ...
     <div class="endpoint">
       <p class="desc">Get up and running in three steps:</p>
       <div class="label">1. Create an agent</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/agents</code></pre>
-      <p class="response-note">Save the agent_id and api_key from the response.</p>
+      <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "My Agent", "description": "What this agent does"}'</code></pre>
+      <p class="response-note">Save the agent_id and api_key from the response. The name appears in outbound emails.</p>
 
       <div class="label" style="margin-top: 1rem;">2. Create a calendar</div>
       <pre><code>curl -s -X POST https://${DOMAIN}/calendars \\
