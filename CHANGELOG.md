@@ -7,8 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through the inbound webhook.
+- **Outbound RSVP replies** — when an agent responds to an inbound invite via `POST /respond`, CalDave sends a METHOD:REPLY iCal email back to the organiser with the agent's acceptance, decline, or tentative status.
+- **Graceful degradation** — if `POSTMARK_SERVER_TOKEN` is not set, outbound emails are silently skipped. All API endpoints continue to work normally.
+- **Outbound email tracking** — new `invite_sent`, `reply_sent`, and `ical_sequence` columns on events prevent duplicate sends and support proper iCal update semantics.
+- **`email_sent` in respond response** — `POST /respond` now includes an `email_sent` boolean indicating whether a reply email was triggered.
 - **All-day events** — events can now be created with `all_day: true` and date-only `start`/`end` in `YYYY-MM-DD` format. End date is inclusive (e.g. `start: "2025-03-15", end: "2025-03-15"` = one-day event). Supported across the full stack: API CRUD, recurring events, inbound email detection (VALUE=DATE), iCal feeds (DTSTART;VALUE=DATE), plain text view, MCP tools, and documentation.
 - **`caldave-mcp` npm package** — standalone MCP server published as `caldave-mcp` on npm. Run with `npx caldave-mcp` with `CALDAVE_API_KEY` set.
+
+- **Postmark webhook event logging** — new endpoint ingests Postmark delivery, bounce, spam, open, and click events into a `postmark_webhooks` table for email deliverability debugging. GET the same URL to view recent events.
+
+### Fixed
+- **`trust proxy` for Fly.io** — set `app.set('trust proxy', 1)` so `express-rate-limit` correctly identifies clients behind Fly's reverse proxy. Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation errors on every cold start.
+- **Improved outbound email logging** — all outbound email operations now log with `[outbound]` prefix including Postmark message IDs on success and status codes on failure.
 
 ### Changed
 - **`rrule` accepted as alias for `recurrence`** — POST/PATCH event endpoints now accept either `rrule` or `recurrence` for the recurrence rule field. `rrule` is the RFC 5545 term and more intuitive for most users.

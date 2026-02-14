@@ -30,9 +30,11 @@ const docsRouter = require('./routes/docs');
 const quickstartRouter = require('./routes/quickstart');
 const manRouter = require('./routes/man');
 const viewRouter = require('./routes/view');
+const postmarkWebhooksRouter = require('./routes/postmark-webhooks');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
@@ -168,6 +170,9 @@ app.use('/feeds', feedsRouter);
 
 // Inbound email webhook (no Bearer auth — token in URL authenticates)
 app.use('/inbound', inboundLimiter, inboundRouter);
+
+// Postmark outbound event webhooks (no auth — obscure URL is the secret)
+app.use('/hooks/pm-Mj7aXcGE23gCfnql', postmarkWebhooksRouter);
 
 // ---------------------------------------------------------------------------
 // Authenticated routes

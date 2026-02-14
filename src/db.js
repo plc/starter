@@ -104,6 +104,27 @@ async function initSchema() {
     -- Per-calendar AgentMail API key for fetching attachments
     ALTER TABLE calendars ADD COLUMN IF NOT EXISTS agentmail_api_key text;
 
+    -- Outbound email tracking
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS invite_sent boolean NOT NULL DEFAULT false;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS reply_sent text;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS ical_sequence integer NOT NULL DEFAULT 0;
+
+    -- Postmark webhook events for email deliverability debugging
+    CREATE TABLE IF NOT EXISTS postmark_webhooks (
+      id            serial PRIMARY KEY,
+      record_type   text NOT NULL,
+      message_id    text,
+      recipient     text,
+      tag           text,
+      error_code    text,
+      error_message text,
+      payload       jsonb,
+      created_at    timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_postmark_webhooks_created
+      ON postmark_webhooks (created_at DESC);
+
     -- Error log for tracking API errors
     CREATE TABLE IF NOT EXISTS error_log (
       id            serial PRIMARY KEY,

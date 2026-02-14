@@ -43,6 +43,8 @@ fly deploy
 | `POST /calendars/:id/events/:eid/respond` | Yes | Accept/decline invite |
 | `GET /feeds/:id.ics?token=TOKEN` | Feed token | iCal feed (subscribable) |
 | `POST /inbound/:token` | Token in URL | Inbound email webhook (per-calendar) |
+| `POST /hooks/pm-Mj7aXcGE23gCfnql` | No (obscure URL) | Postmark outbound event webhook (delivery, bounce, spam, etc.) |
+| `GET /hooks/pm-Mj7aXcGE23gCfnql` | No (obscure URL) | View recent Postmark webhook events (?limit=N&type=Bounce) |
 
 Auth = `Authorization: Bearer <api_key>` (except feeds, which use `?token=` query param)
 
@@ -56,6 +58,7 @@ src/
 ├── lib/
 │   ├── ids.js            — nanoid-based ID generation (agt_, cal_, evt_, inb_)
 │   ├── keys.js           — SHA-256 API key hashing
+│   ├── outbound.js       — Outbound email (iCal invite/reply generation, Postmark sending)
 │   └── recurrence.js     — RRULE parsing, materialization, horizon management
 ├── middleware/
 │   ├── auth.js           — Bearer token auth
@@ -66,7 +69,8 @@ src/
     ├── calendars.js      — Calendar CRUD
     ├── events.js         — Event CRUD + upcoming + respond
     ├── feeds.js          — iCal feed generation
-    └── inbound.js        — Inbound email webhook (per-calendar token URL)
+    ├── inbound.js        — Inbound email webhook (per-calendar token URL)
+    └── postmark-webhooks.js — Postmark outbound event logging (deliverability debugging)
 scripts/
 ├── init-db.sh            — Creates DB if not exists (Docker)
 └── get-port.sh           — Deterministic port from project name
@@ -74,7 +78,7 @@ scripts/
 
 ## Database Schema
 
-Three tables: `agents`, `calendars`, `events`. Schema auto-created on startup.
+Five tables: `agents`, `calendars`, `events`, `postmark_webhooks`, `error_log`. Schema auto-created on startup.
 
 See `CALDAVE_SPEC.md` for full column definitions.
 
@@ -109,6 +113,7 @@ Events can be created with `all_day: true`. When set:
 | `DATABASE_URL` | — | Postgres connection string |
 | `DB_NAME` | `caldave` | Database name for init script |
 | `CALDAVE_DOMAIN` | `caldave.ai` | Domain for calendar email addresses |
+| `POSTMARK_SERVER_TOKEN` | — | Postmark API token for outbound emails (optional; if unset, outbound emails are silently skipped) |
 
 ## Auth Model
 

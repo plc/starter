@@ -35,6 +35,7 @@ services:
       - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-caldave}
       - PORT=${PORT:-3000}
       - INBOUND_WEBHOOK_SECRET=${INBOUND_WEBHOOK_SECRET:-}
+      - POSTMARK_SERVER_TOKEN=${POSTMARK_SERVER_TOKEN:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

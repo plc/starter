@@ -505,7 +505,7 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 3. **Webhook logs** — Failed deliveries are queryable via `GET /calendars/:id/webhook-logs`.
 4. **Domain** — `caldave.ai` for v1. Email addresses: `cal-abc123@caldave.ai`.
 5. **Event size limits** — 64KB for description, 16KB for metadata JSON.
-6. **Outbound email** — Not in v1. Agents can accept/decline internally but organisers are not notified. Stubbed for v2.
+6. **Outbound email** — Implemented. Creating/updating events with attendees sends METHOD:REQUEST invite emails via Postmark. Responding to inbound invites sends METHOD:REPLY emails to the organiser. Requires `POSTMARK_SERVER_TOKEN` env var; gracefully skipped if not set.
 7. **Calendar sharing** — Not in v1. Could add via a `calendar_shares` table later.
 
 ---
@@ -517,5 +517,3 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 - Attachments on events
 - Free/busy lookups
 - CalDAV protocol compliance
-- Outbound calendar invites (agent inviting humans)
-- Outbound email responses (notifying organisers of accept/decline)

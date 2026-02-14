@@ -1586,7 +1586,148 @@ describe('rrule alias and timezone', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 25. Cleanup
+// 25. Outbound email tracking
+// ---------------------------------------------------------------------------
+
+describe('Outbound email tracking', { concurrency: 1 }, () => {
+  let outboundCalId;
+  let calendarEmail;
+
+  before(async () => {
+    const { data: cal } = await api('POST', '/calendars', {
+      token: state.apiKey,
+      body: { name: 'Outbound Test Cal' },
+    });
+    outboundCalId = cal.calendar_id;
+    calendarEmail = cal.email;
+  });
+
+  it('POST event with attendees generates ical_uid', async () => {
+    const start = futureDate(48);
+    const end = futureDate(49);
+    const { status, data } = await api('POST', `/calendars/${outboundCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Team Sync', start, end, attendees: ['alice@example.com', 'bob@example.com'] },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.title, 'Team Sync');
+    assert.ok(data.attendees);
+    assert.equal(data.attendees.length, 2);
+
+    // Wait briefly for fire-and-forget ical_uid assignment
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Fetch event — should now have ical_uid
+    const { data: fetched } = await api('GET', `/calendars/${outboundCalId}/events/${data.id}`, {
+      token: state.apiKey,
+    });
+    assert.ok(fetched.ical_uid, 'event should have ical_uid after creation with attendees');
+    assert.match(fetched.ical_uid, /@caldave\.ai$/, 'auto-generated ical_uid should end with @caldave.ai');
+
+    // Cleanup
+    await api('DELETE', `/calendars/${outboundCalId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('POST event without attendees does not generate ical_uid', async () => {
+    const start = futureDate(48);
+    const end = futureDate(49);
+    const { status, data } = await api('POST', `/calendars/${outboundCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Solo Event', start, end },
+    });
+    assert.equal(status, 201);
+    assert.ok(!data.ical_uid, 'event without attendees should not have ical_uid');
+
+    // Cleanup
+    await api('DELETE', `/calendars/${outboundCalId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('respond to inbound invite returns email_sent field', async () => {
+    // Create an inbound invite
+    const ics = makeIcs({
+      uid: 'outbound-reply-test@example.com',
+      summary: 'Reply Test Meeting',
+      dtstart: '20990801T100000Z',
+      dtend: '20990801T110000Z',
+      organizer: 'organizer@example.com',
+    });
+
+    const { data: inbound } = await api('POST', '/inbound', {
+      body: postmarkPayload(ics, calendarEmail),
+    });
+    assert.equal(inbound.status, 'created');
+
+    // Respond to the invite
+    const { status, data } = await api(
+      'POST',
+      `/calendars/${outboundCalId}/events/${inbound.event_id}/respond`,
+      { token: state.apiKey, body: { response: 'accepted' } }
+    );
+    assert.equal(status, 200);
+    assert.equal(data.response, 'accepted');
+    assert.equal(data.status, 'confirmed');
+    // email_sent should be true (would have been sent if Postmark was configured)
+    assert.equal(typeof data.email_sent, 'boolean', 'response should include email_sent boolean');
+    assert.equal(data.email_sent, true, 'email_sent should be true for inbound invite with organiser');
+  });
+
+  it('respond to API-created event returns email_sent=false', async () => {
+    const start = futureDate(48);
+    const end = futureDate(49);
+    const { data: created } = await api('POST', `/calendars/${outboundCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'API Event', start, end },
+    });
+
+    const { status, data } = await api(
+      'POST',
+      `/calendars/${outboundCalId}/events/${created.id}/respond`,
+      { token: state.apiKey, body: { response: 'accepted' } }
+    );
+    assert.equal(status, 200);
+    assert.equal(data.email_sent, false, 'email_sent should be false for API-created event (no organiser)');
+
+    // Cleanup
+    await api('DELETE', `/calendars/${outboundCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
+  it('PATCH adding attendees triggers outbound invite logic', async () => {
+    const start = futureDate(48);
+    const end = futureDate(49);
+    const { data: created } = await api('POST', `/calendars/${outboundCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Patch Invite Test', start, end },
+    });
+
+    // Add attendees via PATCH
+    const { status, data } = await api(
+      'PATCH',
+      `/calendars/${outboundCalId}/events/${created.id}`,
+      { token: state.apiKey, body: { attendees: ['carol@example.com'] } }
+    );
+    assert.equal(status, 200);
+    assert.deepEqual(data.attendees, ['carol@example.com']);
+
+    // Wait briefly for fire-and-forget ical_uid assignment
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Fetch event — should now have ical_uid
+    const { data: fetched } = await api('GET', `/calendars/${outboundCalId}/events/${created.id}`, {
+      token: state.apiKey,
+    });
+    assert.ok(fetched.ical_uid, 'event should have ical_uid after adding attendees via PATCH');
+
+    // Cleanup
+    await api('DELETE', `/calendars/${outboundCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
+  after(async () => {
+    await api('DELETE', `/calendars/${outboundCalId}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 26. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {
