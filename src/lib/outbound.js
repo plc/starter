@@ -222,7 +222,7 @@ async function sendInviteEmail(event, calendar, recipientEmails, options = {}) {
         from, to, subject, textBody,
         icsAttachment: { name: 'invite.ics', content: icsString, contentType: 'text/calendar; method=REQUEST' },
       });
-      console.log('[outbound] ✓ Invite sent via SMTP: event=%s messageId=%s to=%s', event.id, result.messageId, to);
+      console.log('[outbound] ✓ Invite sent via SMTP: event=%s from=%s messageId=%s to=%s', event.id, from, result.messageId, to);
       return { sent: true, icalUid };
     } catch (err) {
       console.error('[outbound] ✗ SMTP invite FAILED: event=%s to=%s error=%s', event.id, to, err.message);
@@ -298,7 +298,7 @@ async function sendReplyEmail(event, calendar, response, options = {}) {
         from, to: event.organiser_email, subject, textBody,
         icsAttachment: { name: 'response.ics', content: icsString, contentType: 'text/calendar; method=REPLY' },
       });
-      console.log('[outbound] ✓ Reply sent via SMTP: event=%s response=%s messageId=%s to=%s', event.id, response, result.messageId, event.organiser_email);
+      console.log('[outbound] ✓ Reply sent via SMTP: event=%s response=%s from=%s messageId=%s to=%s', event.id, response, from, result.messageId, event.organiser_email);
       return { sent: true };
     } catch (err) {
       console.error('[outbound] ✗ SMTP reply FAILED: event=%s response=%s to=%s error=%s', event.id, response, event.organiser_email, err.message);
