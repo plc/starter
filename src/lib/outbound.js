@@ -138,9 +138,11 @@ function generateReplyIcs(event, calendar, response) {
  * @param {Object} event            — event row from DB
  * @param {Object} calendar         — calendar row from DB
  * @param {string[]} recipientEmails — email addresses to send to
+ * @param {Object} [options]         — optional settings
+ * @param {string} [options.agentName] — agent display name for From header
  * @returns {Promise<{ sent: boolean, reason?: string, icalUid?: string }>}
  */
-async function sendInviteEmail(event, calendar, recipientEmails) {
+async function sendInviteEmail(event, calendar, recipientEmails, options = {}) {
   const client = getPostmarkClient();
   if (!client) {
     console.log('[outbound] Skipping invite (no POSTMARK_SERVER_TOKEN): event=%s', event.id);
@@ -155,11 +157,12 @@ async function sendInviteEmail(event, calendar, recipientEmails) {
   const { icsString, icalUid } = generateInviteIcs(event, calendar);
 
   const to = recipientEmails.join(',');
-  console.log('[outbound] Sending invite: event=%s from=%s to=%s title="%s"', event.id, calendar.email, to, event.title);
+  const from = options.agentName ? '"' + options.agentName + '" <' + calendar.email + '>' : calendar.email;
+  console.log('[outbound] Sending invite: event=%s from=%s to=%s title="%s"', event.id, from, to, event.title);
 
   try {
     const pmResponse = await client.sendEmail({
-      From: calendar.email,
+      From: from,
       To: to,
       Subject: 'Invitation: ' + event.title,
       TextBody: [
@@ -193,9 +196,11 @@ async function sendInviteEmail(event, calendar, recipientEmails) {
  * @param {Object} event    — event row from DB (must have organiser_email and ical_uid)
  * @param {Object} calendar — calendar row from DB
  * @param {string} response — 'accepted' | 'declined' | 'tentative'
+ * @param {Object} [options]         — optional settings
+ * @param {string} [options.agentName] — agent display name for From header
  * @returns {Promise<{ sent: boolean, reason?: string }>}
  */
-async function sendReplyEmail(event, calendar, response) {
+async function sendReplyEmail(event, calendar, response, options = {}) {
   const client = getPostmarkClient();
   if (!client) {
     console.log('[outbound] Skipping reply (no POSTMARK_SERVER_TOKEN): event=%s', event.id);
@@ -215,11 +220,12 @@ async function sendReplyEmail(event, calendar, response) {
   const icsString = generateReplyIcs(event, calendar, response);
   const statusLabel = response.charAt(0).toUpperCase() + response.slice(1);
 
-  console.log('[outbound] Sending %s reply: event=%s from=%s to=%s title="%s"', response, event.id, calendar.email, event.organiser_email, event.title);
+  const from = options.agentName ? '"' + options.agentName + '" <' + calendar.email + '>' : calendar.email;
+  console.log('[outbound] Sending %s reply: event=%s from=%s to=%s title="%s"', response, event.id, from, event.organiser_email, event.title);
 
   try {
     const pmResponse = await client.sendEmail({
-      From: calendar.email,
+      From: from,
       To: event.organiser_email,
       Subject: statusLabel + ': ' + event.title,
       TextBody: calendar.name + ' has ' + response + ' the invitation: ' + event.title,

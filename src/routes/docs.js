@@ -76,9 +76,11 @@ router.get('/', (req, res) => {
 
     <div class="toc">
       <h2>Endpoints</h2>
-      <div class="section">Auth</div>
+      <div class="section">Agents</div>
       <ul>
         <li><a href="#post-agents">POST /agents</a> — Create agent</li>
+        <li><a href="#get-agents-me">GET /agents/me</a> — Get agent profile</li>
+        <li><a href="#patch-agents">PATCH /agents</a> — Update agent</li>
       </ul>
       <div class="section">Calendars</div>
       <ul>
@@ -104,6 +106,11 @@ router.get('/', (req, res) => {
         <li><a href="#get-feed">GET /feeds/:id.ics</a> — iCal feed</li>
         <li><a href="#post-inbound">POST /inbound/:token</a> — Inbound email webhook</li>
       </ul>
+      <div class="section">Discovery</div>
+      <ul>
+        <li><a href="#get-changelog">GET /changelog</a> — API changelog</li>
+        <li><a href="#post-man">POST /man</a> — Machine-readable API manual</li>
+      </ul>
     </div>
 
     <!-- ============================================================ -->
@@ -113,7 +120,7 @@ router.get('/', (req, res) => {
     <p>Exceptions: <code class="inline-code">POST /agents</code> (no auth), <code class="inline-code">GET /feeds</code> (token in query param), and <code class="inline-code">POST /inbound</code> (token in URL path).</p>
 
     <!-- ============================================================ -->
-    <h2>Agent Provisioning</h2>
+    <h2>Agents</h2>
 
     <div class="endpoint" id="post-agents">
       <div class="method-path">
@@ -122,14 +129,69 @@ router.get('/', (req, res) => {
         <span class="auth-badge">No auth</span>
       </div>
       <p class="desc">Create a new agent identity. Returns credentials you must save — the API key is shown once.</p>
+      <div class="label">Body parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">name <span class="param-opt">optional</span></span><span class="param-desc">Display name for the agent (max 255 chars). Shown in outbound email From headers.</span></div>
+        <div class="param"><span class="param-name">description <span class="param-opt">optional</span></span><span class="param-desc">What the agent does (max 1000 chars). Surfaced in POST /man context.</span></div>
+      </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/agents</code></pre>
+      <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "Meeting Scheduler", "description": "Books rooms and sends reminders"}'</code></pre>
       <div class="label">Response</div>
       <pre><code>{
   "agent_id": "agt_x7y8z9AbCd",
   "api_key": "sk_live_abc123...",
+  "name": "Meeting Scheduler",
+  "description": "Books rooms and sends reminders",
   "message": "Store these credentials securely. The API key will not be shown again."
 }</code></pre>
+    </div>
+
+    <div class="endpoint" id="get-agents-me">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/agents/me</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Get the authenticated agent's profile.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/agents/me \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Response</div>
+      <pre><code>{
+  "agent_id": "agt_x7y8z9AbCd",
+  "name": "Meeting Scheduler",
+  "description": "Books rooms and sends reminders",
+  "created_at": "2026-02-14T10:30:00.000Z"
+}</code></pre>
+    </div>
+
+    <div class="endpoint" id="patch-agents">
+      <div class="method-path">
+        <span class="method patch">PATCH</span>
+        <span class="path">/agents</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Update agent metadata. Does not change the API key. Set a field to <code class="inline-code">null</code> to clear it.</p>
+      <div class="label">Body parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">name</span><span class="param-desc">Display name (max 255 chars)</span></div>
+        <div class="param"><span class="param-name">description</span><span class="param-desc">What the agent does (max 1000 chars)</span></div>
+      </div>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X PATCH https://${DOMAIN}/agents \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -d '{"name": "Updated Name"}'</code></pre>
+      <div class="label">Response</div>
+      <pre><code>{
+  "agent_id": "agt_x7y8z9AbCd",
+  "name": "Updated Name",
+  "description": "Books rooms and sends reminders",
+  "created_at": "2026-02-14T10:30:00.000Z"
+}</code></pre>
+      <div class="note">When an agent has a name, outbound invite and RSVP reply emails use it as the From display name (e.g. "Meeting Scheduler" &lt;cal-xxx@${EMAIL_DOMAIN}&gt;).</div>
     </div>
 
     <!-- ============================================================ -->
@@ -461,6 +523,49 @@ Daily standup  2026-02-13 16:00:00Z  ...
 { "status": "updated", "event_id": "evt_xxx" }
 { "status": "cancelled", "event_id": "evt_xxx" }
 { "status": "ignored", "reason": "..." }</code></pre>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2>Discovery</h2>
+
+    <div class="endpoint" id="get-changelog">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/changelog</span>
+        <span class="auth-badge">No auth (optional Bearer)</span>
+      </div>
+      <p class="desc">Structured list of API changes with dates and docs links. With a Bearer token, highlights changes since your agent was created and includes personalized recommendations. Poll ~weekly to discover new features.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/changelog \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Response (authenticated)</div>
+      <pre><code>{
+  "description": "CalDave API changelog...",
+  "your_agent": { "agent_id": "agt_...", "created_at": "..." },
+  "changes_since_signup": [{ "date": "2026-02-14", "changes": [...] }],
+  "changes_since_signup_count": 2,
+  "changelog": [{ "date": "2026-02-08", "changes": [...] }],
+  "recommendations": [
+    { "action": "Name your agent", "why": "...", "how": "PATCH /agents ...", "docs": "..." }
+  ]
+}</code></pre>
+      <div class="note">The <code class="inline-code">recommendations</code> array includes actionable suggestions based on your agent state (e.g. name your agent, create a calendar, create an event). Only present when authenticated and there are suggestions.</div>
+    </div>
+
+    <div class="endpoint" id="post-man">
+      <div class="method-path">
+        <span class="method post">POST</span>
+        <span class="path">/man</span>
+        <span class="auth-badge">No auth (optional Bearer)</span>
+      </div>
+      <p class="desc">Machine-readable API manual. Returns all endpoints with curl examples and parameters. With Bearer auth, includes your real calendar IDs and a recommended next step. Use <code class="inline-code">?guide</code> for a compact onboarding overview.</p>
+      <div class="label">Example — full reference</div>
+      <pre><code>curl -s -X POST https://${DOMAIN}/man \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Example — guided onboarding</div>
+      <pre><code>curl -s -X POST "https://${DOMAIN}/man?guide" \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="note">The <code class="inline-code">?guide</code> mode returns only an overview, your context, a recommended next step, and links to discover more. Ideal for first-time agent onboarding.</div>
     </div>
 
     <!-- ============================================================ -->

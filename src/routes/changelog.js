@@ -130,6 +130,13 @@ const CHANGELOG = [
       },
       {
         type: 'feature',
+        title: 'Agent name in outbound emails',
+        description: 'When your agent has a name set, outbound invite and RSVP reply emails show the agent name as the From display name (e.g. "My Agent" <cal-xxx@invite.caldave.ai>).',
+        endpoints: ['POST /calendars/:id/events', 'PATCH /calendars/:id/events/:event_id', 'POST /calendars/:id/events/:event_id/respond'],
+        docs: BASE + '/docs#agents',
+      },
+      {
+        type: 'feature',
         title: 'Personalized recommendations in changelog',
         description: 'GET /changelog with auth now includes a recommendations array with actionable suggestions based on your agent state (e.g. name your agent, create your first calendar).',
         endpoints: ['GET /changelog'],

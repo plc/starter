@@ -70,6 +70,15 @@ fly deploy
 | **README.md** | When user-facing details change |
 | **GOTCHAS.md** | When you encounter problems |
 
+**IMPORTANT: When adding or changing public API endpoints, you MUST update ALL of these:**
+1. **`src/routes/docs.js`** — the HTML docs page at `/docs` (endpoint card + table of contents)
+2. **`src/routes/changelog.js`** — the structured `CHANGELOG` array served by `GET /changelog`
+3. **`src/routes/man.js`** — the `getEndpoints()` array served by `POST /man`
+4. **`CHANGELOG.md`** — the human-readable changelog
+5. **`CALDAVE_SPEC.md`** — the full API spec
+
+These are all separate and must be kept in sync. Missing any one means agents or humans won't discover the new endpoint.
+
 ## Git Workflow
 
 - **Update CHANGELOG.md before committing** — include it in the same commit as your changes

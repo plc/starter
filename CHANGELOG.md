@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **API changelog endpoint** — `GET /changelog` returns a structured list of API changes with dates and docs links. With optional Bearer auth, highlights changes introduced since the agent was created. Designed for agents to poll ~weekly.
 - **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `POST /man` context.
 - **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through the inbound webhook.
+- **Agent name in outbound emails** — when an agent has a name set (via `PATCH /agents`), outbound invite and RSVP reply emails use `"Agent Name" <calendar-email>` as the From address, so recipients see a friendly display name instead of just the calendar email.
 - **Outbound RSVP replies** — when an agent responds to an inbound invite via `POST /respond`, CalDave sends a METHOD:REPLY iCal email back to the organiser with the agent's acceptance, decline, or tentative status.
 - **Graceful degradation** — if `POSTMARK_SERVER_TOKEN` is not set, outbound emails are silently skipped. All API endpoints continue to work normally.
 - **Outbound email tracking** — new `invite_sent`, `reply_sent`, and `ical_sequence` columns on events prevent duplicate sends and support proper iCal update semantics.
@@ -23,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
 ### Fixed
+- **API docs updated** — `/docs` page now documents `GET /agents/me`, `PATCH /agents`, agent `name`/`description` fields on `POST /agents`, `GET /changelog`, and `POST /man`. Table of contents updated with Agents and Discovery sections.
 - **JSON 404 catch-all** — unmatched routes now return `{"error": "Not found. Try POST /man for the API reference."}` instead of Express's default HTML page.
 - **Guide mode discoverability** — `POST /man?guide` now includes a `discover_more` object pointing to the full API reference, changelog, and agent update endpoint so agents don't have to guess at available endpoints.
 - **Welcome event in /man recommendation** — `POST /man` recommendation logic now accounts for the auto-created welcome event (same fix as changelog recommendations).
