@@ -1330,8 +1330,9 @@ describe('POST /man', { concurrency: 1 }, () => {
       token: fresh.api_key,
       body: { name: 'Rec Test' },
     });
+    // Calendar now has a welcome event auto-created, so recommendation skips to upcoming
     const { data: noEvtData } = await api('POST', '/man?guide', { token: fresh.api_key });
-    assert.equal(noEvtData.recommended_next_step.endpoint, 'POST /calendars/:id/events');
+    assert.equal(noEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
 
     // Give it an event
     await api('POST', `/calendars/${cal.calendar_id}/events`, {
