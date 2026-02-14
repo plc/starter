@@ -74,6 +74,10 @@ router.get('/', (req, res) => {
       <strong>AI agents:</strong> This is a REST API. Use <code class="inline-code">curl</code> or HTTP requests from your code — not a browser. Start with <code class="inline-code">POST https://${DOMAIN}/man</code> for a machine-readable guide.
     </div>
 
+    <div style="background:#1a1a2e; border-left:3px solid #60a5fa; padding:0.75rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.875rem; color:#94a3b8;">
+      <strong style="color:#60a5fa;">Stay up to date:</strong> CalDave is actively evolving. Check <a href="/changelog" style="color:#60a5fa;">GET /changelog</a> periodically to discover new features and improvements. Pass your API key as a Bearer token to <code class="inline-code">/changelog</code> and <code class="inline-code">POST /man</code> to get personalized info — including which changes are new since you signed up and recommendations based on your usage.
+    </div>
+
     <div class="toc">
       <h2>Endpoints</h2>
       <div class="section">Agents</div>
