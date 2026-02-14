@@ -31,10 +31,15 @@ async function softAuth(req, res, next) {
   const hash = hashKey(token);
   try {
     const result = await pool.query(
-      'SELECT id FROM agents WHERE api_key_hash = $1',
+      'SELECT id, name, description FROM agents WHERE api_key_hash = $1',
       [hash]
     );
-    req.agent = result.rows.length > 0 ? { id: result.rows[0].id } : null;
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      req.agent = { id: row.id, name: row.name, description: row.description };
+    } else {
+      req.agent = null;
+    }
   } catch {
     req.agent = null;
   }
@@ -82,14 +87,50 @@ function getEndpoints() {
     {
       method: 'POST',
       path: '/agents',
-      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it).',
+      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Optionally include name and description to identify the agent.',
       auth: 'none',
+      parameters: [
+        { name: 'name', in: 'body', required: false, type: 'string', description: 'Display name for the agent (max 255 chars). Recommended.' },
+        { name: 'description', in: 'body', required: false, type: 'string', description: 'What this agent does (max 1024 chars). Recommended.' },
+      ],
+      example_body: { name: 'My Agent', description: 'Manages team meetings and sends daily summaries' },
+      example_response: {
+        agent_id: 'agt_x7y8z9AbCd',
+        api_key: 'sk_live_abc123...',
+        name: 'My Agent',
+        description: 'Manages team meetings and sends daily summaries',
+        message: 'Store these credentials securely. The API key will not be shown again.',
+      },
+    },
+    {
+      method: 'GET',
+      path: '/agents/me',
+      description: 'Get the authenticated agent profile (name, description, created_at).',
+      auth: 'bearer',
       parameters: [],
       example_body: null,
       example_response: {
         agent_id: 'agt_x7y8z9AbCd',
-        api_key: 'sk_live_abc123...',
-        message: 'Store these credentials securely. The API key will not be shown again.',
+        name: 'My Agent',
+        description: 'Manages team meetings and sends daily summaries',
+        created_at: '2025-01-15T10:30:00.000Z',
+      },
+    },
+    {
+      method: 'PATCH',
+      path: '/agents',
+      description: 'Update the authenticated agent name or description. Does not change the API key.',
+      auth: 'bearer',
+      parameters: [
+        { name: 'name', in: 'body', required: false, type: 'string', description: 'New display name (max 255 chars). Set to null to clear.' },
+        { name: 'description', in: 'body', required: false, type: 'string', description: 'New description (max 1024 chars). Set to null to clear.' },
+      ],
+      example_body: { name: 'Updated Agent Name' },
+      example_response: {
+        agent_id: 'agt_x7y8z9AbCd',
+        name: 'Updated Agent Name',
+        description: 'Manages team meetings and sends daily summaries',
+        created_at: '2025-01-15T10:30:00.000Z',
       },
     },
     {
@@ -403,6 +444,8 @@ router.post('/', softAuth, async (req, res) => {
     const context = {
       authenticated: false,
       agent_id: null,
+      agent_name: null,
+      agent_description: null,
       calendars: [],
     };
 
@@ -412,6 +455,8 @@ router.post('/', softAuth, async (req, res) => {
     if (req.agent) {
       context.authenticated = true;
       context.agent_id = req.agent.id;
+      context.agent_name = req.agent.name || null;
+      context.agent_description = req.agent.description || null;
 
       const { rows } = await pool.query(
         `SELECT c.id, c.name, c.timezone, c.email,

@@ -23,7 +23,7 @@ async function auth(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id FROM agents WHERE api_key_hash = $1',
+      'SELECT id, name, description FROM agents WHERE api_key_hash = $1',
       [hash]
     );
 
@@ -31,7 +31,8 @@ async function auth(req, res, next) {
       return res.status(401).json({ error: 'Invalid API key' });
     }
 
-    req.agent = { id: result.rows[0].id };
+    const row = result.rows[0];
+    req.agent = { id: row.id, name: row.name, description: row.description };
     next();
   } catch (err) {
     await logError(err, { route: 'auth middleware', method: req.method });

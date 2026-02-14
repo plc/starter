@@ -62,6 +62,151 @@ describe('Agents', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
+// 2b. Agent metadata
+// ---------------------------------------------------------------------------
+
+describe('Agent metadata', { concurrency: 1 }, () => {
+  it('POST /agents without fields creates agent', async () => {
+    const { status, data } = await api('POST', '/agents');
+    assert.equal(status, 201);
+    assert.ok(data.agent_id);
+    assert.ok(data.api_key);
+    assert.match(data.agent_id, /^agt_/);
+    assert.match(data.api_key, /^sk_live_/);
+    assert.equal(data.name, undefined);
+    assert.equal(data.description, undefined);
+  });
+
+  it('POST /agents with name only', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'Weather Bot' },
+    });
+    assert.equal(status, 201);
+    assert.ok(data.agent_id);
+    assert.ok(data.api_key);
+    assert.equal(data.name, 'Weather Bot');
+    assert.equal(data.description, undefined);
+  });
+
+  it('POST /agents with name and description', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'Meeting Scheduler', description: 'Books conference rooms and sends daily standup reminders to the engineering team' },
+    });
+    assert.equal(status, 201);
+    assert.ok(data.agent_id);
+    assert.ok(data.api_key);
+    assert.equal(data.name, 'Meeting Scheduler');
+    assert.equal(data.description, 'Books conference rooms and sends daily standup reminders to the engineering team');
+  });
+
+  it('POST /agents rejects unknown fields', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'Bot', foo: 'bar' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('foo'));
+  });
+
+  it('POST /agents rejects name > 255 chars', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'x'.repeat(256) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('255'));
+  });
+
+  it('GET /agents/me returns agent profile', async () => {
+    const { status, data } = await api('GET', '/agents/me', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.agent_id, state.agentId);
+    assert.ok(data.created_at);
+  });
+
+  it('GET /agents/me requires auth', async () => {
+    const { status } = await api('GET', '/agents/me');
+    assert.equal(status, 401);
+  });
+
+  it('PATCH /agents updates name without changing api key', async () => {
+    const { status, data } = await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: { name: 'Updated Bot' },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.agent_id, state.agentId);
+    assert.equal(data.name, 'Updated Bot');
+    // api_key should NOT be in the response (key never changes)
+    assert.equal(data.api_key, undefined);
+
+    // Verify the same api key still works after the update
+    const { status: meStatus } = await api('GET', '/agents/me', { token: state.apiKey });
+    assert.equal(meStatus, 200);
+  });
+
+  it('PATCH /agents updates description', async () => {
+    const { status, data } = await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: { description: 'Now with a description' },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.description, 'Now with a description');
+    assert.equal(data.name, 'Updated Bot'); // name persists from previous patch
+  });
+
+  it('PATCH /agents clears name with null', async () => {
+    const { status, data } = await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: { name: null },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.name, null);
+  });
+
+  it('PATCH /agents requires auth', async () => {
+    const { status } = await api('PATCH', '/agents', {
+      body: { name: 'Sneaky' },
+    });
+    assert.equal(status, 401);
+  });
+
+  it('PATCH /agents rejects unknown fields', async () => {
+    const { status, data } = await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: { api_key: 'sk_live_hacked' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('api_key'));
+  });
+
+  it('PATCH /agents rejects empty body', async () => {
+    const { status, data } = await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: {},
+    });
+    assert.equal(status, 400);
+  });
+
+  it('GET /agents/me reflects updated metadata', async () => {
+    // Set a name first
+    await api('PATCH', '/agents', {
+      token: state.apiKey,
+      body: { name: 'Final Name', description: 'Final desc' },
+    });
+    const { status, data } = await api('GET', '/agents/me', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.name, 'Final Name');
+    assert.equal(data.description, 'Final desc');
+  });
+
+  it('POST /man includes agent name in context', async () => {
+    const { status, data } = await api('POST', '/man?guide', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.your_context.agent_name, 'Final Name');
+    assert.equal(data.your_context.agent_description, 'Final desc');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3. Calendar CRUD
 // ---------------------------------------------------------------------------
 

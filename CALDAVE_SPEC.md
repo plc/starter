@@ -40,6 +40,7 @@ A calendar entry. Events have:
 - An **API key** (bearer token) authenticates an agent
 - An agent can own multiple calendars
 - API keys are generated at agent provisioning time
+- Agents can optionally have a **name** and **description** for identification
 
 ---
 
@@ -87,14 +88,58 @@ Agents need to know when it's time to act. Two mechanisms:
 ### Agent Provisioning
 
 #### `POST /agents`
-Creates a new agent identity. No auth required (or protected by an operator-level secret — see Open Questions).
+Creates a new agent identity. No auth required. Optionally accepts `name` and `description` to identify the agent.
+
+**Request (optional):**
+```json
+{
+  "name": "My Assistant",
+  "description": "Manages team calendars and sends meeting reminders"
+}
+```
 
 **Response:**
 ```json
 {
   "agent_id": "agt_x7y8z9",
   "api_key": "sk_live_abc123...",
+  "name": "My Assistant",
+  "description": "Manages team calendars and sends meeting reminders",
   "message": "Store these credentials securely. The API key will not be shown again."
+}
+```
+
+#### `GET /agents/me`
+Get the authenticated agent's profile.
+
+**Response:**
+```json
+{
+  "agent_id": "agt_x7y8z9",
+  "name": "My Assistant",
+  "description": "Manages team calendars and sends meeting reminders",
+  "created_at": "2025-01-15T10:30:00.000Z"
+}
+```
+
+#### `PATCH /agents`
+Update the authenticated agent's metadata. Does not change the API key.
+
+**Request:**
+```json
+{
+  "name": "Updated Name",
+  "description": "New description"
+}
+```
+
+**Response:**
+```json
+{
+  "agent_id": "agt_x7y8z9",
+  "name": "Updated Name",
+  "description": "New description",
+  "created_at": "2025-01-15T10:30:00.000Z"
 }
 ```
 
@@ -398,7 +443,9 @@ The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP cl
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | `text` PK | `agt_` prefixed |
-| `api_key_hash` | `text` | bcrypt hash of the API key |
+| `api_key_hash` | `text` | SHA-256 hash of the API key |
+| `name` | `text` | Nullable, display name for the agent |
+| `description` | `text` | Nullable, what the agent does |
 | `created_at` | `timestamptz` | |
 
 ### `calendars`

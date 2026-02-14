@@ -24,6 +24,8 @@ async function initSchema() {
     CREATE TABLE IF NOT EXISTS agents (
       id              text PRIMARY KEY,
       api_key_hash    text NOT NULL,
+      name            text,
+      description     text,
       created_at      timestamptz NOT NULL DEFAULT now()
     );
 
@@ -59,6 +61,10 @@ async function initSchema() {
       created_at      timestamptz NOT NULL DEFAULT now(),
       updated_at      timestamptz NOT NULL DEFAULT now()
     );
+
+    -- Agent metadata columns (backfill for existing DBs)
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS name text;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS description text;
 
     -- Indexes for common query patterns
     CREATE INDEX IF NOT EXISTS idx_events_calendar_start
