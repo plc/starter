@@ -169,7 +169,18 @@ View SMTP configuration (password excluded). Returns `null` if not configured.
 Remove SMTP configuration. Outbound emails revert to CalDave's built-in delivery.
 
 #### `POST /agents/smtp/test`
-Send a test email to verify SMTP configuration works. Sends to the configured `from` address.
+Send a test email to verify SMTP configuration works. By default sends to the configured `from` address. Optionally accepts a `to` parameter to send to a different address.
+
+**Request (optional):**
+```json
+{
+  "to": "test@example.com"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `to` | No | Email address to send the test email to. Defaults to the configured `from` address if omitted. |
 
 **Response:**
 ```json
@@ -177,7 +188,8 @@ Send a test email to verify SMTP configuration works. Sends to the configured `f
   "success": true,
   "message_id": "<abc123@smtp.agentmail.to>",
   "from": "inbox@agentmail.to",
-  "message": "Test email sent successfully to inbox@agentmail.to."
+  "to": "test@example.com",
+  "message": "Test email sent successfully to test@example.com."
 }
 ```
 
@@ -253,6 +265,13 @@ Machine-readable API manual. Returns a JSON document describing all CalDave endp
 
 Auth is optional. If a valid Bearer token is provided, the response includes the agent's real calendar IDs and event counts, with personalized curl examples and a recommended next step.
 
+**Query parameters:**
+
+| Param | Description |
+|-------|-------------|
+| `guide` | When present, returns a condensed guide for new agents with recommended next steps |
+| `topic` | Filter endpoints by category. Valid topics: `agents`, `smtp`, `calendars`, `events`, `feeds`, `errors`. Comma-separated for multiple (e.g. `?topic=events,calendars`). Discovery endpoints (`/man`, `/changelog`) are always included regardless of filter. |
+
 **Response:**
 ```json
 {
@@ -267,6 +286,17 @@ Auth is optional. If a valid Bearer token is provided, the response includes the
     "action": "Check upcoming events",
     "endpoint": "GET /calendars/:id/upcoming",
     "curl": "curl -s https://caldave.ai/calendars/cal_xxx/upcoming ..."
+  },
+  "error_format": {
+    "shape": { "error": "Human-readable error message" },
+    "status_codes": {
+      "400": "Bad request (validation errors, unknown fields)",
+      "401": "Unauthorized (missing or invalid API key)",
+      "404": "Not found",
+      "429": "Rate limited",
+      "500": "Internal server error"
+    },
+    "notes": "All error responses follow this shape. Rate limit errors include Retry-After header."
   },
   "endpoints": [{ "method": "POST", "path": "/agents", "description": "...", "auth": "none", "parameters": [], "example_curl": "...", "example_response": {} }]
 }

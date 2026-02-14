@@ -1483,6 +1483,64 @@ describe('POST /man', { concurrency: 1 }, () => {
     }
   });
 
+  it('?topic= filters endpoints by category', async () => {
+    const { status, data } = await api('GET', '/man?topic=events');
+    assert.equal(status, 200);
+    assert.ok(data.topic === 'events');
+    assert.ok(Array.isArray(data.available_topics));
+    // Should only have event endpoints + discovery
+    for (const ep of data.endpoints) {
+      const isEvent = ep.path.includes('/events') || ep.path.includes('/upcoming') || ep.path.includes('/view') || ep.path.includes('/respond');
+      const isDiscovery = ep.path === '/man' || ep.path === '/changelog';
+      assert.ok(isEvent || isDiscovery, 'Unexpected endpoint in topic=events: ' + ep.path);
+    }
+    // Should have fewer endpoints than unfiltered
+    const { data: full } = await api('GET', '/man');
+    assert.ok(data.endpoints.length < full.endpoints.length, 'Filtered should have fewer endpoints');
+  });
+
+  it('?topic= supports comma-separated topics', async () => {
+    const { status, data } = await api('GET', '/man?topic=agents,smtp');
+    assert.equal(status, 200);
+    for (const ep of data.endpoints) {
+      const isAgent = ep.path.startsWith('/agents') && !ep.path.includes('/smtp');
+      const isSmtp = ep.path.includes('/smtp');
+      const isDiscovery = ep.path === '/man' || ep.path === '/changelog';
+      assert.ok(isAgent || isSmtp || isDiscovery, 'Unexpected endpoint in topic=agents,smtp: ' + ep.path);
+    }
+  });
+
+  it('?topic= with invalid topic returns 400', async () => {
+    const { status, data } = await api('GET', '/man?topic=bogus');
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('Unknown topic'));
+    assert.ok(data.error.includes('Available'));
+  });
+
+  it('response includes error_format', async () => {
+    const { data } = await api('GET', '/man');
+    assert.ok(data.error_format);
+    assert.ok(data.error_format.shape);
+    assert.ok(data.error_format.status_codes);
+    assert.ok(data.error_format.status_codes['400']);
+    assert.ok(data.error_format.status_codes['401']);
+    assert.ok(data.error_format.notes);
+  });
+
+  it('?guide response includes error_format', async () => {
+    const { data } = await api('GET', '/man?guide');
+    assert.ok(data.error_format);
+    assert.ok(data.error_format.status_codes);
+  });
+
+  it('response includes available_topics', async () => {
+    const { data } = await api('GET', '/man');
+    assert.ok(Array.isArray(data.available_topics));
+    assert.ok(data.available_topics.includes('events'));
+    assert.ok(data.available_topics.includes('agents'));
+    assert.ok(data.available_topics.includes('calendars'));
+  });
+
   it('recommendation changes based on agent state', async () => {
     // Create a fresh agent (no name) — first recommendation is to name it
     const { data: fresh } = await api('POST', '/agents');
@@ -2014,7 +2072,34 @@ describe('API Changelog', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 27. Cleanup
+// 28. SMTP test endpoint validation
+// ---------------------------------------------------------------------------
+
+describe('SMTP test endpoint', { concurrency: 1 }, () => {
+  it('POST /agents/smtp/test without SMTP configured returns 400', async () => {
+    const { status, data } = await api('POST', '/agents/smtp/test', { token: state.apiKey });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('No SMTP configured'));
+  });
+
+  it('POST /agents/smtp/test with to param still checks SMTP first', async () => {
+    const { status, data } = await api('POST', '/agents/smtp/test', {
+      token: state.apiKey,
+      body: { to: 'test@example.com' },
+    });
+    // Should fail on SMTP check before to validation matters
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('No SMTP configured'));
+  });
+
+  it('POST /agents/smtp/test requires auth', async () => {
+    const { status } = await api('POST', '/agents/smtp/test');
+    assert.equal(status, 401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 29. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

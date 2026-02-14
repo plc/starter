@@ -85,6 +85,7 @@ function buildCurl(method, path, { apiKey, calId, evtId, body, queryString } = {
 function getEndpoints() {
   return [
     {
+      topic: 'agents',
       method: 'POST',
       path: '/agents',
       description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Include name and description — the name appears in outbound email From headers.',
@@ -103,6 +104,7 @@ function getEndpoints() {
       },
     },
     {
+      topic: 'agents',
       method: 'GET',
       path: '/agents/me',
       description: 'Get the authenticated agent profile (name, description, created_at).',
@@ -117,6 +119,7 @@ function getEndpoints() {
       },
     },
     {
+      topic: 'agents',
       method: 'PATCH',
       path: '/agents',
       description: 'Update the authenticated agent name or description. Does not change the API key.',
@@ -134,6 +137,7 @@ function getEndpoints() {
       },
     },
     {
+      topic: 'smtp',
       method: 'PUT',
       path: '/agents/smtp',
       description: 'Configure SMTP for outbound emails. When set, all invite and RSVP emails are sent via your SMTP server instead of CalDave built-in delivery.',
@@ -150,6 +154,7 @@ function getEndpoints() {
       example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', secure: true, configured: true } },
     },
     {
+      topic: 'smtp',
       method: 'GET',
       path: '/agents/smtp',
       description: 'View SMTP configuration (password excluded). Returns null if not configured.',
@@ -159,6 +164,7 @@ function getEndpoints() {
       example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', secure: true, configured: true } },
     },
     {
+      topic: 'smtp',
       method: 'DELETE',
       path: '/agents/smtp',
       description: 'Remove SMTP configuration. Outbound emails revert to CalDave built-in delivery.',
@@ -168,26 +174,32 @@ function getEndpoints() {
       example_response: { smtp: null, message: 'SMTP configuration removed.' },
     },
     {
+      topic: 'smtp',
       method: 'POST',
       path: '/agents/smtp/test',
-      description: 'Send a test email to verify SMTP configuration works. Sends to the configured from address.',
+      description: 'Send a test email to verify SMTP configuration works. Defaults to the configured from address, or specify a custom recipient.',
       auth: 'bearer',
-      parameters: [],
-      example_body: null,
-      example_response: { success: true, message_id: '<...>', from: 'inbox@agentmail.to', message: 'Test email sent successfully.' },
+      parameters: [
+        { name: 'to', in: 'body', required: false, type: 'string', description: 'Recipient email address (default: the configured from address)' },
+      ],
+      example_body: { to: 'test@example.com' },
+      example_response: { success: true, message_id: '<...>', from: 'inbox@agentmail.to', to: 'test@example.com', message: 'Test email sent successfully.' },
     },
     {
+      topic: 'discovery',
       method: 'GET',
       path: '/man',
-      description: 'This endpoint. Machine-readable API manual with optional personalized context. Add ?guide to skip the full endpoint catalog.',
+      description: 'This endpoint. Machine-readable API manual with optional personalized context. Add ?guide to skip the full endpoint catalog, or ?topic= to filter by category.',
       auth: 'none (optional bearer)',
       parameters: [
         { name: 'guide', in: 'query', required: false, type: 'flag', description: 'If present, return only overview, context, and recommended next step (skip endpoint details)' },
+        { name: 'topic', in: 'query', required: false, type: 'string', description: 'Filter endpoints by topic. Comma-separated. Options: agents, smtp, calendars, events, feeds, errors' },
       ],
       example_body: null,
       example_response: '{ overview, base_url, your_context, recommended_next_step, endpoints }',
     },
     {
+      topic: 'discovery',
       method: 'GET',
       path: '/changelog',
       description: 'API changelog. Lists new features, improvements, and fixes with dates and links to docs. Poll ~weekly to discover new capabilities. With auth, highlights changes since your agent was created.',
@@ -201,6 +213,7 @@ function getEndpoints() {
       },
     },
     {
+      topic: 'calendars',
       method: 'POST',
       path: '/calendars',
       description: 'Create a new calendar for the authenticated agent.',
@@ -225,6 +238,7 @@ function getEndpoints() {
       },
     },
     {
+      topic: 'calendars',
       method: 'GET',
       path: '/calendars',
       description: 'List all calendars for the authenticated agent.',
@@ -234,6 +248,7 @@ function getEndpoints() {
       example_response: { calendars: ['...'] },
     },
     {
+      topic: 'calendars',
       method: 'GET',
       path: '/calendars/:id',
       description: 'Get a single calendar by ID.',
@@ -245,6 +260,7 @@ function getEndpoints() {
       example_response: { id: 'cal_...', name: '...', timezone: '...', email: '...' },
     },
     {
+      topic: 'calendars',
       method: 'PATCH',
       path: '/calendars/:id',
       description: 'Update calendar settings. All fields optional.',
@@ -262,6 +278,7 @@ function getEndpoints() {
       example_response: { id: 'cal_...', name: 'Updated Name', timezone: 'America/New_York' },
     },
     {
+      topic: 'calendars',
       method: 'DELETE',
       path: '/calendars/:id',
       description: 'Delete a calendar and all its events. Returns 204.',
@@ -273,6 +290,7 @@ function getEndpoints() {
       example_response: null,
     },
     {
+      topic: 'calendars',
       method: 'POST',
       path: '/calendars/:id/webhook/test',
       description: 'Send a test payload to the calendar webhook URL. Returns the HTTP status code. Verifies webhook configuration before real events fire.',
@@ -284,6 +302,7 @@ function getEndpoints() {
       example_response: { success: true, status_code: 200, webhook_url: 'https://...', message: 'Webhook delivered successfully.' },
     },
     {
+      topic: 'events',
       method: 'POST',
       path: '/calendars/:id/events',
       description: 'Create an event. Supports one-off and recurring (RRULE) events.',
@@ -305,6 +324,7 @@ function getEndpoints() {
       example_response: { id: 'evt_...', title: 'Team standup', calendar_id: 'cal_...', status: 'confirmed' },
     },
     {
+      topic: 'events',
       method: 'GET',
       path: '/calendars/:id/events',
       description: 'List events with optional filters. Returns expanded recurring instances.',
@@ -321,6 +341,7 @@ function getEndpoints() {
       example_response: { events: ['...'] },
     },
     {
+      topic: 'events',
       method: 'GET',
       path: '/calendars/:id/events/:event_id',
       description: 'Get a single event by ID.',
@@ -333,6 +354,7 @@ function getEndpoints() {
       example_response: { id: 'evt_...', title: '...', start_time: '...', end_time: '...', status: '...' },
     },
     {
+      topic: 'events',
       method: 'PATCH',
       path: '/calendars/:id/events/:event_id',
       description: 'Update an event. Patching a recurring instance marks it as an exception; patching the parent propagates to non-exception instances.',
@@ -355,6 +377,7 @@ function getEndpoints() {
       example_response: { id: 'evt_...', title: 'Updated title', location: 'Room 42' },
     },
     {
+      topic: 'events',
       method: 'DELETE',
       path: '/calendars/:id/events/:event_id',
       description: 'Delete an event. For recurring instances, use the mode query parameter.',
@@ -368,6 +391,7 @@ function getEndpoints() {
       example_response: null,
     },
     {
+      topic: 'events',
       method: 'GET',
       path: '/calendars/:id/upcoming',
       description: 'Get the next N events from now. Designed for agent polling.',
@@ -380,6 +404,7 @@ function getEndpoints() {
       example_response: { events: ['...'], next_event_starts_in: 'PT14M30S' },
     },
     {
+      topic: 'events',
       method: 'GET',
       path: '/calendars/:id/view',
       description: 'Plain text table of upcoming events. Returns text/plain.',
@@ -392,6 +417,7 @@ function getEndpoints() {
       example_response: '(text/plain table)',
     },
     {
+      topic: 'events',
       method: 'POST',
       path: '/calendars/:id/events/:event_id/respond',
       description: 'Accept or decline an inbound calendar invite.',
@@ -405,6 +431,7 @@ function getEndpoints() {
       example_response: { id: 'evt_...', status: 'confirmed', response: 'accepted', email_sent: true },
     },
     {
+      topic: 'feeds',
       method: 'GET',
       path: '/feeds/:calendar_id.ics',
       description: 'Read-only iCalendar feed. Subscribe from Google Calendar, Apple Calendar, or any iCal app. The feed_token is returned when you create a calendar.',
@@ -417,6 +444,7 @@ function getEndpoints() {
       example_response: '(text/calendar iCal data)',
     },
     {
+      topic: 'feeds',
       method: 'POST',
       path: '/inbound/:token',
       description: 'Inbound email webhook. Receives forwarded .ics invites. Each calendar has a unique webhook URL returned at creation. Supports Postmark and AgentMail.',
@@ -428,6 +456,7 @@ function getEndpoints() {
       example_response: { status: 'created', event_id: 'evt_...' },
     },
     {
+      topic: 'errors',
       method: 'GET',
       path: '/errors',
       description: 'Query recent API errors for your agent.',
@@ -440,6 +469,7 @@ function getEndpoints() {
       example_response: { errors: ['...'], count: 0 },
     },
     {
+      topic: 'errors',
       method: 'GET',
       path: '/errors/:id',
       description: 'Get a single error with full stack trace.',
@@ -571,6 +601,23 @@ router.get('/', softAuth, async (req, res) => {
 
     const recommendation = buildRecommendation(context, apiKey, calId);
 
+    const ERROR_FORMAT = {
+      shape: '{ "error": "Human-readable message" }',
+      status_codes: {
+        200: 'Success',
+        201: 'Created',
+        204: 'Deleted (no body)',
+        400: 'Validation error — check the error message for details',
+        401: 'Missing or invalid API key',
+        404: 'Resource not found',
+        429: 'Rate limited — check RateLimit-Reset header',
+        500: 'Server error — retry or check GET /errors',
+      },
+      notes: 'All error responses return JSON with a single "error" key containing a human-readable message. Rate limit headers (RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset) are included on every response.',
+    };
+
+    const AVAILABLE_TOPICS = ['agents', 'smtp', 'calendars', 'events', 'feeds', 'errors'];
+
     // guide mode: skip the full endpoint catalog
     const guide = 'guide' in req.query;
     if (guide) {
@@ -578,6 +625,7 @@ router.get('/', softAuth, async (req, res) => {
         overview: 'CalDave is a calendar-as-a-service API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.',
         base_url: BASE,
         rate_limits: { api: '1000/min', agent_creation: '20/hour', inbound: '60/min' },
+        error_format: ERROR_FORMAT,
         your_context: context,
         recommended_next_step: recommendation,
         discover_more: {
@@ -588,7 +636,24 @@ router.get('/', softAuth, async (req, res) => {
       });
     }
 
-    const endpoints = getEndpoints().map(ep => {
+    // Topic filtering
+    const topicParam = req.query.topic;
+    let rawEndpoints = getEndpoints();
+    if (topicParam) {
+      const topics = topicParam.split(',').map(t => t.trim().toLowerCase());
+      const validTopics = topics.filter(t => AVAILABLE_TOPICS.includes(t));
+      if (validTopics.length === 0) {
+        return res.status(400).json({
+          error: 'Unknown topic: ' + topicParam + '. Available: ' + AVAILABLE_TOPICS.join(', '),
+        });
+      }
+      // Always include discovery endpoints alongside requested topics
+      rawEndpoints = rawEndpoints.filter(ep =>
+        validTopics.includes(ep.topic) || ep.topic === 'discovery'
+      );
+    }
+
+    const endpoints = rawEndpoints.map(ep => {
       const needsAuth = ep.auth === 'bearer';
       const curlOpts = {};
       if (needsAuth) curlOpts.apiKey = apiKey;
@@ -631,19 +696,24 @@ router.get('/', softAuth, async (req, res) => {
       };
     });
 
-    res.json({
+    const response = {
       overview: 'CalDave is a calendar-as-a-service API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.',
       base_url: BASE,
+      available_topics: AVAILABLE_TOPICS,
       rate_limits: {
         api: '1000 requests/minute per IP',
         agent_creation: '20 requests/hour per IP',
         inbound_webhooks: '60 requests/minute per IP',
         headers: 'RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset (RFC draft-7)',
       },
+      error_format: ERROR_FORMAT,
       your_context: context,
       recommended_next_step: recommendation,
       endpoints,
-    });
+    };
+    if (topicParam) response.topic = topicParam;
+
+    res.json(response);
   } catch (err) {
     await logError(err, { route: 'GET /man', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Internal server error' });

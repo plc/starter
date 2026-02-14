@@ -346,8 +346,23 @@ router.post('/smtp/test', auth, async (req, res) => {
       return res.status(400).json({ error: 'No SMTP configured. Use PUT /agents/smtp to configure your SMTP server first.' });
     }
 
+    // Optional recipient override
+    const body = req.body || {};
+    if (body.to !== undefined) {
+      if (typeof body.to !== 'string') {
+        return res.status(400).json({ error: 'to must be a string (email address)' });
+      }
+      if (!body.to.includes('@')) {
+        return res.status(400).json({ error: 'to must be a valid email address' });
+      }
+      if (body.to.length > 255) {
+        return res.status(400).json({ error: 'to exceeds 255 character limit' });
+      }
+    }
+
     const r = rows[0];
     const smtpConfig = { host: r.smtp_host, port: r.smtp_port, user: r.smtp_user, pass: r.smtp_pass, from: r.smtp_from, secure: r.smtp_secure };
+    const testRecipient = body.to || smtpConfig.from;
 
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
@@ -366,11 +381,11 @@ router.post('/smtp/test', auth, async (req, res) => {
       });
     }
 
-    // Send a test email to the SMTP from address
+    // Send a test email
     try {
       const info = await transporter.sendMail({
         from: smtpConfig.from,
-        to: smtpConfig.from,
+        to: testRecipient,
         subject: 'CalDave SMTP Test',
         text: 'This is a test email from CalDave to verify your SMTP configuration is working correctly.',
       });
@@ -379,7 +394,8 @@ router.post('/smtp/test', auth, async (req, res) => {
         success: true,
         message_id: info.messageId,
         from: smtpConfig.from,
-        message: 'Test email sent successfully to ' + smtpConfig.from + '.',
+        to: testRecipient,
+        message: 'Test email sent successfully to ' + testRecipient + '.',
       });
     } catch (sendErr) {
       res.json({

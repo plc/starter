@@ -127,6 +127,10 @@ router.get('/', (req, res) => {
         <li><a href="#get-changelog">GET /changelog</a> — API changelog</li>
         <li><a href="#get-man">GET /man</a> — Machine-readable API manual</li>
       </ul>
+      <div class="section">Reference</div>
+      <ul>
+        <li><a href="#error-handling">Error Handling</a> — Status codes &amp; error format</li>
+      </ul>
     </div>
 
     <!-- ============================================================ -->
@@ -135,6 +139,23 @@ router.get('/', (req, res) => {
     <pre><code>Authorization: Bearer YOUR_API_KEY</code></pre>
     <p>Exceptions: <code class="inline-code">POST /agents</code> (no auth), <code class="inline-code">GET /feeds</code> (token in query param), and <code class="inline-code">POST /inbound</code> (token in URL path).</p>
     <p style="margin-top:1rem; font-size:0.8125rem; color:#64748b;">In curl examples below, <code class="inline-code" style="color:#fbbf24;">YOUR_API_KEY</code>, <code class="inline-code" style="color:#fbbf24;">CAL_ID</code>, <code class="inline-code" style="color:#fbbf24;">EVT_ID</code>, and <code class="inline-code" style="color:#fbbf24;">FEED_TOKEN</code> are placeholders — replace them with your real values.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="error-handling">Error Handling</h2>
+    <p>All error responses return a JSON object with a single <code class="inline-code">error</code> field:</p>
+    <pre><code>{ "error": "Human-readable message" }</code></pre>
+    <div class="label">Status codes</div>
+    <div class="params">
+      <div class="param"><span class="param-name">200</span><span class="param-desc">Success</span></div>
+      <div class="param"><span class="param-name">201</span><span class="param-desc">Created</span></div>
+      <div class="param"><span class="param-name">204</span><span class="param-desc">Deleted (no body)</span></div>
+      <div class="param"><span class="param-name">400</span><span class="param-desc">Validation error — check the <code class="inline-code">error</code> message for details</span></div>
+      <div class="param"><span class="param-name">401</span><span class="param-desc">Missing or invalid API key</span></div>
+      <div class="param"><span class="param-name">404</span><span class="param-desc">Resource not found</span></div>
+      <div class="param"><span class="param-name">429</span><span class="param-desc">Rate limited — back off and retry after the interval in <code class="inline-code">RateLimit-Reset</code></span></div>
+      <div class="param"><span class="param-name">500</span><span class="param-desc">Server error — retry or check <code class="inline-code">GET /errors</code> for details</span></div>
+    </div>
+    <div class="note">Every response includes rate limit headers: <code class="inline-code">RateLimit-Limit</code>, <code class="inline-code">RateLimit-Remaining</code>, and <code class="inline-code">RateLimit-Reset</code> (RFC draft-7). Monitor these to avoid 429 responses.</div>
 
     <h3 style="margin-top:1.5rem;">Rate Limits</h3>
     <div class="params" style="margin-bottom:1.5rem;">
@@ -284,16 +305,23 @@ router.get('/', (req, res) => {
         <span class="path">/agents/smtp/test</span>
         <span class="auth-badge required">Bearer token</span>
       </div>
-      <p class="desc">Send a test email to verify your SMTP configuration works. Sends to the configured <code class="inline-code">from</code> address and reports the result.</p>
+      <p class="desc">Send a test email to verify your SMTP configuration works. Defaults to the configured <code class="inline-code">from</code> address; override with <code class="inline-code">to</code>.</p>
+      <div class="label">Body parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">to <span class="param-opt">optional</span></span><span class="param-desc">Recipient email address. Defaults to the configured <code class="inline-code">from</code> address.</span></div>
+      </div>
       <div class="label">Example</div>
       <pre><code>curl -s -X POST "https://${DOMAIN}/agents/smtp/test" \\
-  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -d '{"to": "test@example.com"}'</code></pre>
       <div class="label">Response</div>
       <pre><code>{
   "success": true,
   "message_id": "&lt;abc123@smtp.agentmail.to&gt;",
   "from": "inbox@agentmail.to",
-  "message": "Test email sent successfully to inbox@agentmail.to."
+  "to": "test@example.com",
+  "message": "Test email sent successfully to test@example.com."
 }</code></pre>
     </div>
 
@@ -718,13 +746,24 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <span class="auth-badge">No auth (optional Bearer)</span>
       </div>
       <p class="desc">Machine-readable API manual. Returns all endpoints with curl examples and parameters. With Bearer auth, includes your real calendar IDs and a recommended next step. Use <code class="inline-code">?guide</code> for a compact onboarding overview.</p>
+      <div class="label">Query parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">guide</span><span class="param-desc">Compact onboarding overview (no value needed, just <code class="inline-code">?guide</code>)</span></div>
+        <div class="param"><span class="param-name">topic</span><span class="param-desc">Filter to specific topic(s). Returns only matching endpoints plus discovery endpoints. Comma-separated for multiple topics.<br>Available topics: <code class="inline-code">agents</code>, <code class="inline-code">smtp</code>, <code class="inline-code">calendars</code>, <code class="inline-code">events</code>, <code class="inline-code">feeds</code>, <code class="inline-code">errors</code></span></div>
+      </div>
       <div class="label">Example — full reference</div>
       <pre><code>curl -s "https://${DOMAIN}/man" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Example — guided onboarding</div>
       <pre><code>curl -s "https://${DOMAIN}/man?guide" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Example — topic-scoped</div>
+      <pre><code>curl -s "https://${DOMAIN}/man?topic=events" \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <pre><code>curl -s "https://${DOMAIN}/man?topic=agents,smtp" \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="note">The <code class="inline-code">?guide</code> mode returns only an overview, your context, a recommended next step, and links to discover more. Ideal for first-time agent onboarding.</div>
+      <div class="note">The <code class="inline-code">?topic=</code> filter is useful when you only need docs for a specific area. For example, <code class="inline-code">?topic=events</code> returns only event endpoints plus discovery. Combine topics with commas: <code class="inline-code">?topic=agents,smtp</code>.</div>
     </div>
 
     <!-- ============================================================ -->

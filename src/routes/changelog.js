@@ -123,6 +123,27 @@ const CHANGELOG = [
     changes: [
       {
         type: 'feature',
+        title: 'Scoped /man with ?topic= filter',
+        description: 'GET /man now supports ?topic= to filter endpoints by category (agents, smtp, calendars, events, feeds, errors). Comma-separated for multiple topics. Discovery endpoints (/man, /changelog) are always included. Reduces token usage for agents with limited context windows.',
+        endpoints: ['GET /man'],
+        docs: BASE + '/docs#get-man',
+      },
+      {
+        type: 'feature',
+        title: 'Error format documentation in /man',
+        description: 'GET /man response now includes error_format with the standard error shape, status codes, and notes. Also included in ?guide mode so agents know what to expect from error responses.',
+        endpoints: ['GET /man'],
+        docs: BASE + '/docs#get-man',
+      },
+      {
+        type: 'improvement',
+        title: 'SMTP test to parameter',
+        description: 'POST /agents/smtp/test now accepts an optional to body parameter to send the test email to a specific address instead of the configured from address.',
+        endpoints: ['POST /agents/smtp/test'],
+        docs: BASE + '/docs#post-smtp-test',
+      },
+      {
+        type: 'feature',
         title: 'SMTP test endpoint',
         description: 'POST /agents/smtp/test sends a test email to verify your SMTP configuration works. Sends to the configured from address and reports success/failure with details.',
         endpoints: ['POST /agents/smtp/test'],

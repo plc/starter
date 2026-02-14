@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Scoped `/man` with `?topic=` filter** — `GET /man` now supports `?topic=` to filter endpoints by category (`agents`, `smtp`, `calendars`, `events`, `feeds`, `errors`). Comma-separated for multiple topics. Discovery endpoints (`/man`, `/changelog`) are always included. Reduces token usage for agents with limited context windows.
+- **Error format documentation in `/man`** — `GET /man` response now includes `error_format` with the standard error shape, status codes, and notes. Also included in `?guide` mode so agents know what to expect from error responses.
+- **SMTP test `to` parameter** — `POST /agents/smtp/test` now accepts an optional `to` body parameter to send the test email to a specific address instead of the configured `from` address.
 - **SMTP test endpoint** — `POST /agents/smtp/test` sends a test email to verify your SMTP configuration works. Sends to the configured `from` address and reports success/failure with the SMTP error message if any.
 - **SMTP `secure` field** — `PUT /agents/smtp` now accepts an optional `secure` boolean to explicitly control TLS mode. Use `true` for implicit TLS (port 465) or `false` for STARTTLS (port 587). Auto-detected from port when omitted.
 - **Webhook config at calendar creation** — `POST /calendars` now accepts `webhook_url`, `webhook_secret`, and `webhook_offsets` at creation time, saving a separate `PATCH` call.
