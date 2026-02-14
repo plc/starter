@@ -82,6 +82,25 @@ describe('Calendars', { concurrency: 1 }, () => {
     state.feedToken = data.feed_token;
   });
 
+  it('new calendar has a welcome event', async () => {
+    const { status, data } = await api('GET', `/calendars/${state.calendarId}/events`, { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.equal(data.events.length, 1);
+    const welcome = data.events[0];
+    assert.match(welcome.title, /Peter/);
+    assert.match(welcome.description, /peterclark@me\.com/);
+    assert.equal(welcome.status, 'confirmed');
+
+    // Should be at 9am tomorrow in the calendar's timezone (America/Denver = UTC-7)
+    const start = new Date(welcome.start);
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    assert.equal(start.toISOString().slice(0, 10), tomorrow.toISOString().slice(0, 10));
+
+    // Save so cleanup tests can account for it
+    state.welcomeEventId = welcome.id;
+  });
+
   it('GET /calendars lists calendars', async () => {
     const { status, data } = await api('GET', '/calendars', { token: state.apiKey });
     assert.equal(status, 200);
