@@ -32,6 +32,7 @@ const manRouter = require('./routes/man');
 const viewRouter = require('./routes/view');
 const postmarkWebhooksRouter = require('./routes/postmark-webhooks');
 const legalRouter = require('./routes/legal');
+const changelogRouter = require('./routes/changelog');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
@@ -170,6 +171,8 @@ app.use('/quickstart', quickstartRouter);
 app.use('/', legalRouter);
 // Machine-readable API manual (optional auth handled internally)
 app.use('/man', manRouter);
+// API changelog (optional auth handled internally)
+app.use('/changelog', changelogRouter);
 // Agent provisioning (no auth, strict rate limit)
 app.use('/agents', agentCreationLimiter, agentsRouter);
 

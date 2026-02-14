@@ -145,6 +145,19 @@ function getEndpoints() {
       example_response: '{ overview, base_url, your_context, recommended_next_step, endpoints }',
     },
     {
+      method: 'GET',
+      path: '/changelog',
+      description: 'API changelog. Lists new features, improvements, and fixes with dates and links to docs. Poll ~weekly to discover new capabilities. With auth, highlights changes since your agent was created.',
+      auth: 'none (optional bearer)',
+      parameters: [],
+      example_body: null,
+      example_response: {
+        description: 'CalDave API changelog...',
+        poll_recommendation: 'Check this endpoint approximately once per week.',
+        changelog: [{ date: '2026-02-14', changes: ['...'] }],
+      },
+    },
+    {
       method: 'POST',
       path: '/calendars',
       description: 'Create a new calendar for the authenticated agent.',

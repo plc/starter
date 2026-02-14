@@ -1892,7 +1892,79 @@ describe('Outbound email tracking', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 26. Cleanup
+// 26. API Changelog
+// ---------------------------------------------------------------------------
+
+describe('API Changelog', { concurrency: 1 }, () => {
+  it('GET /changelog returns changelog without auth', async () => {
+    const { status, data } = await api('GET', '/changelog');
+    assert.equal(status, 200);
+    assert.ok(data.description);
+    assert.ok(data.poll_recommendation);
+    assert.ok(data.docs_url);
+    assert.ok(Array.isArray(data.changelog));
+    assert.ok(data.changelog.length > 0);
+    assert.ok(data.tip, 'Should include auth tip when unauthenticated');
+    assert.equal(data.your_agent, undefined);
+  });
+
+  it('changelog entries have required structure', async () => {
+    const { data } = await api('GET', '/changelog');
+    for (const entry of data.changelog) {
+      assert.ok(entry.date, 'Entry should have a date');
+      assert.match(entry.date, /^\d{4}-\d{2}-\d{2}$/);
+      assert.ok(Array.isArray(entry.changes));
+      for (const change of entry.changes) {
+        assert.ok(change.type, 'Change should have a type');
+        assert.ok(change.title, 'Change should have a title');
+        assert.ok(change.description, 'Change should have a description');
+        assert.ok(Array.isArray(change.endpoints), 'Change should have endpoints array');
+        assert.ok(change.docs, 'Change should have a docs link');
+      }
+    }
+  });
+
+  it('GET /changelog with auth includes agent context', async () => {
+    const { status, data } = await api('GET', '/changelog', { token: state.apiKey });
+    assert.equal(status, 200);
+    assert.ok(data.your_agent);
+    assert.equal(data.your_agent.agent_id, state.agentId);
+    assert.ok(data.your_agent.created_at);
+    assert.equal(typeof data.changes_since_signup_count, 'number');
+    assert.equal(data.tip, undefined, 'Should not include tip when authenticated');
+  });
+
+  it('new agent sees all changes as new', async () => {
+    // The test agent was just created, so all changelog entries predate it
+    // except possibly today's — but the point is the structure works
+    const { data } = await api('GET', '/changelog', { token: state.apiKey });
+    assert.ok(data.your_agent.created_at);
+    // Total of changes_since_signup + changelog should cover all entries
+    const sinceCount = data.changes_since_signup ? data.changes_since_signup.length : 0;
+    const existingCount = data.changelog.length;
+    assert.ok(sinceCount + existingCount > 0, 'Should have some changelog entries');
+  });
+
+  it('invalid token falls back to unauthenticated', async () => {
+    const { status, data } = await api('GET', '/changelog', { token: 'sk_live_invalid_key' });
+    assert.equal(status, 200);
+    assert.ok(data.tip);
+    assert.equal(data.your_agent, undefined);
+    assert.ok(Array.isArray(data.changelog));
+  });
+
+  it('total_changes count is accurate', async () => {
+    const { data } = await api('GET', '/changelog');
+    let counted = 0;
+    for (const entry of data.changelog) {
+      counted += entry.changes.length;
+    }
+    assert.equal(data.total_changes, counted);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 27. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

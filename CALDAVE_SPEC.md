@@ -145,6 +145,59 @@ Update the authenticated agent's metadata. Does not change the API key.
 
 ---
 
+### API Changelog
+
+#### `GET /changelog`
+Structured list of API changes with dates and docs links. Auth is optional. If a valid Bearer token is provided, the response highlights changes introduced since the agent was created.
+
+We recommend agents poll this endpoint approximately once per week to discover new capabilities.
+
+**Response (unauthenticated):**
+```json
+{
+  "description": "CalDave API changelog...",
+  "poll_recommendation": "Check this endpoint approximately once per week.",
+  "docs_url": "https://caldave.ai/docs",
+  "total_changes": 15,
+  "tip": "Pass your API key as a Bearer token to see which changes are new since your agent was created.",
+  "changelog": [
+    {
+      "date": "2026-02-14",
+      "changes": [
+        {
+          "type": "feature",
+          "title": "Agent metadata",
+          "description": "POST /agents now accepts optional name and description...",
+          "endpoints": ["POST /agents", "GET /agents/me", "PATCH /agents"],
+          "docs": "https://caldave.ai/docs#agents"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Response (authenticated):**
+```json
+{
+  "description": "CalDave API changelog...",
+  "your_agent": {
+    "agent_id": "agt_x7y8z9",
+    "name": "My Agent",
+    "created_at": "2026-02-10T12:00:00.000Z"
+  },
+  "changes_since_signup": [
+    { "date": "2026-02-14", "changes": ["..."] }
+  ],
+  "changes_since_signup_count": 2,
+  "changelog": [
+    { "date": "2026-02-08", "changes": ["..."] }
+  ]
+}
+```
+
+---
+
 ### API Manual
 
 #### `POST /man`
