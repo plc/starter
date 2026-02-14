@@ -93,11 +93,13 @@ async function buildRecommendations(agent) {
         docs: BASE + '/docs#calendars',
       });
     } else {
-      const emptyCals = rows.filter(r => parseInt(r.event_count, 10) === 0);
-      if (emptyCals.length > 0 && emptyCals.length === rows.length) {
+      // Each new calendar gets an auto-created welcome event, so <=1 means
+      // the agent hasn't created any events of their own yet.
+      const lowCals = rows.filter(r => parseInt(r.event_count, 10) <= 1);
+      if (lowCals.length > 0 && lowCals.length === rows.length) {
         recs.push({
-          action: 'Create your first event',
-          why: 'You have ' + rows.length + (rows.length === 1 ? ' calendar' : ' calendars') + ' but no events yet.',
+          action: 'Create an event',
+          why: 'You have ' + rows.length + (rows.length === 1 ? ' calendar' : ' calendars') + ' but haven\'t created any events yet. New calendars include a welcome event, but try creating your own.',
           how: 'POST /calendars/' + rows[0].id + '/events with {"title": "Team standup", "start": "...", "end": "..."}',
           docs: BASE + '/docs#events',
         });
