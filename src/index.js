@@ -173,8 +173,9 @@ app.use('/', legalRouter);
 app.use('/man', manRouter);
 // API changelog (optional auth handled internally)
 app.use('/changelog', changelogRouter);
-// Agent provisioning (no auth, strict rate limit)
-app.use('/agents', agentCreationLimiter, agentsRouter);
+// Agent provisioning (POST rate-limited, GET/PATCH use general API limiter)
+app.post('/agents', agentCreationLimiter);
+app.use('/agents', agentsRouter);
 
 // iCal feeds (no Bearer auth — uses feed_token query param)
 app.use('/feeds', feedsRouter);

@@ -148,7 +148,7 @@ Update the authenticated agent's metadata. Does not change the API key.
 ### API Changelog
 
 #### `GET /changelog`
-Structured list of API changes with dates and docs links. Auth is optional. If a valid Bearer token is provided, the response highlights changes introduced since the agent was created.
+Structured list of API changes with dates and docs links. Auth is optional. If a valid Bearer token is provided, the response highlights changes introduced since the agent was created and includes personalized recommendations.
 
 We recommend agents poll this endpoint approximately once per week to discover new capabilities.
 
@@ -192,9 +192,19 @@ We recommend agents poll this endpoint approximately once per week to discover n
   "changes_since_signup_count": 2,
   "changelog": [
     { "date": "2026-02-08", "changes": ["..."] }
+  ],
+  "recommendations": [
+    {
+      "action": "Add a description to your agent",
+      "why": "A description helps you and others understand what your agent does.",
+      "how": "PATCH /agents with {\"description\": \"Manages team meetings\"}",
+      "docs": "https://caldave.ai/docs#agents"
+    }
   ]
 }
 ```
+
+The `recommendations` array is only present when authenticated and when there are actionable suggestions. Possible recommendations include: naming your agent, adding a description, creating your first calendar, and creating your first event.
 
 ---
 

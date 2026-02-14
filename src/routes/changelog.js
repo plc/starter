@@ -33,12 +33,12 @@ async function softAuth(req, res, next) {
   const hash = hashKey(token);
   try {
     const result = await pool.query(
-      'SELECT id, name, created_at FROM agents WHERE api_key_hash = $1',
+      'SELECT id, name, description, created_at FROM agents WHERE api_key_hash = $1',
       [hash]
     );
     if (result.rows.length > 0) {
       const row = result.rows[0];
-      req.agent = { id: row.id, name: row.name, created_at: row.created_at };
+      req.agent = { id: row.id, name: row.name, description: row.description, created_at: row.created_at };
     } else {
       req.agent = null;
     }
@@ -46,6 +46,68 @@ async function softAuth(req, res, next) {
     req.agent = null;
   }
   next();
+}
+
+// ---------------------------------------------------------------------------
+// Build personalized recommendations based on agent state
+// ---------------------------------------------------------------------------
+
+async function buildRecommendations(agent) {
+  const recs = [];
+
+  if (!agent.name) {
+    recs.push({
+      action: 'Name your agent',
+      why: 'Your agent has no name set. Named agents are easier to identify in calendar invites and logs.',
+      how: 'PATCH /agents with {"name": "My Agent"}',
+      docs: BASE + '/docs#agents',
+    });
+  }
+
+  if (!agent.description) {
+    recs.push({
+      action: 'Add a description to your agent',
+      why: 'A description helps you and others understand what your agent does.',
+      how: 'PATCH /agents with {"description": "Manages team meetings"}',
+      docs: BASE + '/docs#agents',
+    });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.name,
+              COUNT(e.id) FILTER (WHERE e.status != 'recurring') AS event_count
+       FROM calendars c
+       LEFT JOIN events e ON e.calendar_id = c.id
+       WHERE c.agent_id = $1
+       GROUP BY c.id
+       ORDER BY c.created_at`,
+      [agent.id]
+    );
+
+    if (rows.length === 0) {
+      recs.push({
+        action: 'Create your first calendar',
+        why: 'You have no calendars yet. Calendars are required before you can create events or receive invites.',
+        how: 'POST /calendars with {"name": "My Calendar", "timezone": "America/New_York"}',
+        docs: BASE + '/docs#calendars',
+      });
+    } else {
+      const emptyCals = rows.filter(r => parseInt(r.event_count, 10) === 0);
+      if (emptyCals.length > 0 && emptyCals.length === rows.length) {
+        recs.push({
+          action: 'Create your first event',
+          why: 'You have ' + rows.length + (rows.length === 1 ? ' calendar' : ' calendars') + ' but no events yet.',
+          how: 'POST /calendars/' + rows[0].id + '/events with {"title": "Team standup", "start": "...", "end": "..."}',
+          docs: BASE + '/docs#events',
+        });
+      }
+    }
+  } catch {
+    // If calendar query fails, skip calendar-based recommendations
+  }
+
+  return recs;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +125,13 @@ const CHANGELOG = [
         description: 'POST /agents now accepts optional name and description fields. New GET /agents/me returns agent profile. New PATCH /agents updates metadata without changing the API key.',
         endpoints: ['POST /agents', 'GET /agents/me', 'PATCH /agents'],
         docs: BASE + '/docs#agents',
+      },
+      {
+        type: 'feature',
+        title: 'Personalized recommendations in changelog',
+        description: 'GET /changelog with auth now includes a recommendations array with actionable suggestions based on your agent state (e.g. name your agent, create your first calendar).',
+        endpoints: ['GET /changelog'],
+        docs: BASE + '/docs#changelog',
       },
     ],
   },
@@ -277,6 +346,12 @@ router.get('/', softAuth, async (req, res) => {
       result.changes_since_signup = newEntries.length > 0 ? newEntries : null;
       result.changes_since_signup_count = newEntries.reduce((sum, e) => sum + e.changes.length, 0);
       result.changelog = existingEntries;
+
+      // Personalized recommendations based on agent state
+      const recs = await buildRecommendations(req.agent);
+      if (recs.length > 0) {
+        result.recommendations = recs;
+      }
     } else {
       result.tip = 'Pass your API key as a Bearer token to see which changes are new since your agent was created.';
       result.changelog = CHANGELOG;

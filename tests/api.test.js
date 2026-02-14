@@ -1961,6 +1961,46 @@ describe('API Changelog', { concurrency: 1 }, () => {
     }
     assert.equal(data.total_changes, counted);
   });
+
+  it('unauthenticated changelog has no recommendations', async () => {
+    const { data } = await api('GET', '/changelog');
+    assert.equal(data.recommendations, undefined);
+  });
+
+  it('agent with name, description, and events gets no recommendations', async () => {
+    // state agent has name, description, calendars, and events from prior tests
+    const { data } = await api('GET', '/changelog', { token: state.apiKey });
+    assert.equal(data.recommendations, undefined, 'Fully set up agent should have no recommendations');
+  });
+
+  it('new agent without name gets recommendations with correct structure', async () => {
+    const { data: agent } = await api('POST', '/agents');
+    assert.ok(agent.api_key);
+
+    const { data } = await api('GET', '/changelog', { token: agent.api_key });
+    assert.ok(Array.isArray(data.recommendations), 'New agent should get recommendations');
+    assert.ok(data.recommendations.length > 0, 'Should have at least one recommendation');
+
+    // Every recommendation has the required fields
+    for (const rec of data.recommendations) {
+      assert.ok(rec.action, 'Recommendation should have action');
+      assert.ok(rec.why, 'Recommendation should have why');
+      assert.ok(rec.how, 'Recommendation should have how');
+      assert.ok(rec.docs, 'Recommendation should have docs');
+    }
+
+    // Should recommend naming the agent
+    const nameRec = data.recommendations.find(r => r.action.toLowerCase().includes('name'));
+    assert.ok(nameRec, 'Should recommend naming the agent');
+
+    // Should recommend adding a description
+    const descRec = data.recommendations.find(r => r.action.toLowerCase().includes('description'));
+    assert.ok(descRec, 'Should recommend adding a description');
+
+    // Should recommend creating a calendar
+    const calRec = data.recommendations.find(r => r.action.toLowerCase().includes('calendar'));
+    assert.ok(calRec, 'Should recommend creating a calendar');
+  });
 });
 
 // ---------------------------------------------------------------------------

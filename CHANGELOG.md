@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Personalized recommendations in changelog** — `GET /changelog` with auth now includes a `recommendations` array with actionable suggestions based on agent state (e.g. name your agent, create your first calendar, add a description).
 - **API changelog endpoint** — `GET /changelog` returns a structured list of API changes with dates and docs links. With optional Bearer auth, highlights changes introduced since the agent was created. Designed for agents to poll ~weekly.
 - **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `POST /man` context.
 - **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through the inbound webhook.
@@ -22,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
 ### Fixed
+- **Agent creation rate limiter scope** — the strict agent creation rate limiter (POST /agents) no longer applies to GET /agents/me and PATCH /agents, which now use the general API rate limiter instead.
 - **`trust proxy` for Fly.io** — set `app.set('trust proxy', 1)` so `express-rate-limit` correctly identifies clients behind Fly's reverse proxy. Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation errors on every cold start.
 - **Improved outbound email logging** — all outbound email operations now log with `[outbound]` prefix including Postmark message IDs on success and status codes on failure.
 

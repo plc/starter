@@ -3,9 +3,14 @@
  *
  * Uses express-rate-limit for actual enforcement.
  * Exports multiple limiters for different route groups.
+ *
+ * Rate limiting is disabled when NODE_ENV=test so integration
+ * tests can run without hitting limits.
  */
 
 const rateLimit = require('express-rate-limit');
+
+const skipInTest = () => process.env.NODE_ENV === 'test';
 
 /**
  * General API rate limiter (authenticated routes).
@@ -16,6 +21,7 @@ const apiLimiter = rateLimit({
   limit: 1000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  skip: skipInTest,
   message: { error: 'Too many requests, please try again later' },
 });
 
@@ -28,6 +34,7 @@ const agentCreationLimiter = rateLimit({
   limit: 20,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  skip: skipInTest,
   message: { error: 'Too many agent creation requests, please try again later' },
 });
 
@@ -40,6 +47,7 @@ const inboundLimiter = rateLimit({
   limit: 60,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  skip: skipInTest,
   message: { error: 'Too many requests' },
 });
 
