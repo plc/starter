@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Postmark webhook event logging** — new endpoint ingests Postmark delivery, bounce, spam, open, and click events into a `postmark_webhooks` table for email deliverability debugging. GET the same URL to view recent events.
 - **Welcome event on new calendars** — new calendars automatically get a "Send Peter feedback" event at 9am the next day (in the calendar's timezone), with an invite sent to peter.clark@gmail.com.
+- **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
 ### Fixed
 - **`trust proxy` for Fly.io** — set `app.set('trust proxy', 1)` so `express-rate-limit` correctly identifies clients behind Fly's reverse proxy. Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation errors on every cold start.

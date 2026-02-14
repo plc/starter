@@ -31,6 +31,7 @@ const quickstartRouter = require('./routes/quickstart');
 const manRouter = require('./routes/man');
 const viewRouter = require('./routes/view');
 const postmarkWebhooksRouter = require('./routes/postmark-webhooks');
+const legalRouter = require('./routes/legal');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
@@ -150,6 +151,12 @@ curl -s -X POST https://${DOMAIN}/man?guide</code></pre>
     <div class="links">
       <a href="/docs" class="primary">API Docs</a>
     </div>
+
+    <footer style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid #334155; text-align:center; font-size:0.8125rem; color:#64748b;">
+      <a href="/terms" style="color:#94a3b8; text-decoration:none;">Terms</a> &middot;
+      <a href="/privacy" style="color:#94a3b8; text-decoration:none;">Privacy</a> &middot;
+      Created by <a href="https://plc.vc/qbs" style="color:#94a3b8; text-decoration:none;">Peter Clark</a>
+    </footer>
   </div>
 </body>
 </html>`;
@@ -157,9 +164,10 @@ curl -s -X POST https://${DOMAIN}/man?guide</code></pre>
   res.send(html);
 });
 
-// API documentation and quick start (no auth)
+// API documentation, quick start, and legal pages (no auth)
 app.use('/docs', docsRouter);
 app.use('/quickstart', quickstartRouter);
+app.use('/', legalRouter);
 // Machine-readable API manual (optional auth handled internally)
 app.use('/man', manRouter);
 // Agent provisioning (no auth, strict rate limit)

@@ -489,6 +489,11 @@ Daily standup  2026-02-13 16:00:00Z  ...
   }'</code></pre>
     </div>
 
+    <footer style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid #334155; text-align:center; font-size:0.8125rem; color:#64748b;">
+      <a href="/terms" style="color:#94a3b8; text-decoration:none;">Terms</a> &middot;
+      <a href="/privacy" style="color:#94a3b8; text-decoration:none;">Privacy</a> &middot;
+      Created by <a href="https://plc.vc/qbs" style="color:#94a3b8; text-decoration:none;">Peter Clark</a>
+    </footer>
   </div>
 
   <script>
