@@ -584,7 +584,7 @@ router.post('/', async (req, res) => {
 
     return await processInboundEmail(calendars[0], req.body, res);
   } catch (err) {
-    await logError(err, { route: 'POST /inbound', method: 'POST' });
+    logError(err, { route: 'POST /inbound', method: 'POST' });
     return res.json({ status: 'error', reason: 'Internal processing error' });
   }
 });
@@ -613,7 +613,7 @@ router.post('/:token', async (req, res) => {
 
     return await processInboundEmail(calendars[0], req.body, res);
   } catch (err) {
-    await logError(err, { route: 'POST /inbound/:token', method: 'POST' });
+    logError(err, { route: 'POST /inbound/:token', method: 'POST' });
     // Always return 200 so webhook services don't retry
     return res.json({ status: 'error', reason: 'Internal processing error' });
   }

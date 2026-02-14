@@ -264,7 +264,7 @@ app.use((req, res) => {
 
 app.use(async (err, req, res, _next) => {
   const { logError } = require('./lib/errors');
-  await logError(err, { route: `${req.method} ${req.path}`, method: req.method, agent_id: req.agent?.id });
+  logError(err, { route: `${req.method} ${req.path}`, method: req.method, agent_id: req.agent?.id });
   res.status(500).json({ error: 'Internal server error' });
 });
 

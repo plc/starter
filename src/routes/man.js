@@ -483,6 +483,9 @@ function getEndpoints() {
   ];
 }
 
+// Pre-compute at module load (static data, never changes at runtime)
+const CACHED_ENDPOINTS = getEndpoints();
+
 // ---------------------------------------------------------------------------
 // Recommendation logic
 // ---------------------------------------------------------------------------
@@ -645,7 +648,7 @@ router.get('/', softAuth, async (req, res) => {
 
     // Topic filtering
     const topicParam = req.query.topic;
-    let rawEndpoints = getEndpoints();
+    let rawEndpoints = CACHED_ENDPOINTS;
     if (topicParam) {
       const topics = topicParam.split(',').map(t => t.trim().toLowerCase());
       const validTopics = topics.filter(t => AVAILABLE_TOPICS.includes(t));
@@ -729,7 +732,7 @@ router.get('/', softAuth, async (req, res) => {
 
     res.json(response);
   } catch (err) {
-    await logError(err, { route: 'GET /man', method: 'GET', agent_id: req.agent?.id });
+    logError(err, { route: 'GET /man', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

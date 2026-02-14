@@ -35,7 +35,7 @@ async function auth(req, res, next) {
     req.agent = { id: row.id, name: row.name, description: row.description };
     next();
   } catch (err) {
-    await logError(err, { route: 'auth middleware', method: req.method });
+    logError(err, { route: 'auth middleware', method: req.method });
     res.status(500).json({ error: 'Internal server error' });
   }
 }

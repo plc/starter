@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Improved
+- **Auth performance** — Added missing database index on `agents.api_key_hash`. Auth lookups now use an index scan instead of a full table scan on every authenticated request.
+- **`/docs` caching** — Static HTML documentation is pre-computed at startup and served with `Cache-Control: public, max-age=86400`. Eliminates ~30KB of string construction per request.
+- **Fire-and-forget error logging** — Error log INSERTs no longer block error responses. Clients get their 500 response immediately while logging completes in the background.
+- **iCal feed ETag/caching** — `GET /feeds/*.ics` now returns `ETag` and `Cache-Control: public, max-age=300`. Calendar clients that send `If-None-Match` get a `304 Not Modified` when nothing has changed, skipping the full feed rebuild.
+- **`/man` endpoint catalog cached** — Static endpoint catalog is pre-computed at module load instead of rebuilt on every request.
+- **Parallel recurring event extension** — The daily materialization job now processes all recurring events concurrently instead of sequentially.
+
 ### Fixed
 - **Attendee input validation** — `attendees` field now requires an array of valid email strings. Non-array values, non-string elements, and invalid emails are rejected with 400. Attendees are deduplicated case-insensitively and capped at 50 per event. Previously, invalid values could be stored and crash the iCal feed.
 - **End-before-start validation** — Timed events where `end` is before `start` are now rejected with 400. All-day events already had this check.

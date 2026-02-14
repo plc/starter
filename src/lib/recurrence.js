@@ -241,21 +241,25 @@ async function extendAllHorizons(pool) {
   const thresholdDate = new Date(now.getTime() + EXTEND_THRESHOLD_DAYS * 24 * 60 * 60 * 1000);
   const newHorizon = new Date(now.getTime() + MATERIALIZE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
+  // Process all parents concurrently (they're independent)
+  const results = await Promise.allSettled(
+    parents
+      .filter(parent => {
+        const meta = parent.metadata || {};
+        const currentHorizon = meta._materialized_until
+          ? new Date(meta._materialized_until)
+          : new Date(0);
+        return currentHorizon < thresholdDate;
+      })
+      .map(parent => extendHorizon(pool, parent, newHorizon))
+  );
+
   let totalCreated = 0;
-
-  for (const parent of parents) {
-    const meta = parent.metadata || {};
-    const currentHorizon = meta._materialized_until
-      ? new Date(meta._materialized_until)
-      : new Date(0); // force extension if never materialized
-
-    if (currentHorizon < thresholdDate) {
-      try {
-        const created = await extendHorizon(pool, parent, newHorizon);
-        totalCreated += created;
-      } catch (err) {
-        console.error(`Failed to extend horizon for ${parent.id}:`, err.message);
-      }
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      totalCreated += result.value;
+    } else {
+      console.error('Failed to extend horizon:', result.reason?.message);
     }
   }
 

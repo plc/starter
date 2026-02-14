@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(response);
   } catch (err) {
-    await logError(err, { route: 'POST /agents', method: 'POST' });
+    logError(err, { route: 'POST /agents', method: 'POST' });
     res.status(500).json({ error: 'Failed to create agent' });
   }
 });
@@ -110,7 +110,7 @@ router.get('/me', auth, async (req, res) => {
       created_at: agent.created_at,
     });
   } catch (err) {
-    await logError(err, { route: 'GET /agents/me', method: 'GET', agent_id: req.agent.id });
+    logError(err, { route: 'GET /agents/me', method: 'GET', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to get agent' });
   }
 });
@@ -181,7 +181,7 @@ router.patch('/', auth, async (req, res) => {
       created_at: agent.created_at,
     });
   } catch (err) {
-    await logError(err, { route: 'PATCH /agents', method: 'PATCH', agent_id: req.agent.id });
+    logError(err, { route: 'PATCH /agents', method: 'PATCH', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to update agent' });
   }
 });
@@ -274,7 +274,7 @@ router.put('/smtp', auth, async (req, res) => {
 
     res.json({ smtp: formatSmtpResponse(rows[0]) });
   } catch (err) {
-    await logError(err, { route: 'PUT /agents/smtp', method: 'PUT', agent_id: req.agent.id });
+    logError(err, { route: 'PUT /agents/smtp', method: 'PUT', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to configure SMTP' });
   }
 });
@@ -304,7 +304,7 @@ router.get('/smtp', auth, async (req, res) => {
 
     res.json({ smtp });
   } catch (err) {
-    await logError(err, { route: 'GET /agents/smtp', method: 'GET', agent_id: req.agent.id });
+    logError(err, { route: 'GET /agents/smtp', method: 'GET', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to get SMTP configuration' });
   }
 });
@@ -325,7 +325,7 @@ router.delete('/smtp', auth, async (req, res) => {
       message: 'SMTP configuration removed. Outbound emails will use CalDave\'s built-in delivery.',
     });
   } catch (err) {
-    await logError(err, { route: 'DELETE /agents/smtp', method: 'DELETE', agent_id: req.agent.id });
+    logError(err, { route: 'DELETE /agents/smtp', method: 'DELETE', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to remove SMTP configuration' });
   }
 });
@@ -407,7 +407,7 @@ router.post('/smtp/test', auth, async (req, res) => {
       });
     }
   } catch (err) {
-    await logError(err, { route: 'POST /agents/smtp/test', method: 'POST', agent_id: req.agent.id });
+    logError(err, { route: 'POST /agents/smtp/test', method: 'POST', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to test SMTP' });
   }
 });

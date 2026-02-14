@@ -486,7 +486,7 @@ router.get('/', softAuth, async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    await logError(err, { route: 'GET /changelog', method: 'GET', agent_id: req.agent?.id });
+    logError(err, { route: 'GET /changelog', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

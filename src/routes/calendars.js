@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
       message,
     });
   } catch (err) {
-    await logError(err, { route: 'POST /calendars', method: 'POST', agent_id: req.agent?.id });
+    logError(err, { route: 'POST /calendars', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to create calendar' });
   }
 });
@@ -158,7 +158,7 @@ router.get('/', async (req, res) => {
     );
     res.json({ calendars: rows.map(formatCalendar) });
   } catch (err) {
-    await logError(err, { route: 'GET /calendars', method: 'GET', agent_id: req.agent?.id });
+    logError(err, { route: 'GET /calendars', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to list calendars' });
   }
 });
@@ -172,7 +172,7 @@ router.get('/:id', async (req, res) => {
     if (!cal) return;
     res.json(formatCalendar(cal));
   } catch (err) {
-    await logError(err, { route: 'GET /calendars/:id', method: 'GET', agent_id: req.agent?.id });
+    logError(err, { route: 'GET /calendars/:id', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to get calendar' });
   }
 });
@@ -227,7 +227,7 @@ router.patch('/:id', async (req, res) => {
 
     res.json(formatCalendar(rows[0]));
   } catch (err) {
-    await logError(err, { route: 'PATCH /calendars/:id', method: 'PATCH', agent_id: req.agent?.id });
+    logError(err, { route: 'PATCH /calendars/:id', method: 'PATCH', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to update calendar' });
   }
 });
@@ -289,7 +289,7 @@ router.post('/:id/webhook/test', async (req, res) => {
       });
     }
   } catch (err) {
-    await logError(err, { route: 'POST /calendars/:id/webhook/test', method: 'POST', agent_id: req.agent?.id });
+    logError(err, { route: 'POST /calendars/:id/webhook/test', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to test webhook' });
   }
 });
@@ -305,7 +305,7 @@ router.delete('/:id', async (req, res) => {
     await pool.query('DELETE FROM calendars WHERE id = $1', [req.params.id]);
     res.status(204).end();
   } catch (err) {
-    await logError(err, { route: 'DELETE /calendars/:id', method: 'DELETE', agent_id: req.agent?.id });
+    logError(err, { route: 'DELETE /calendars/:id', method: 'DELETE', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to delete calendar' });
   }
 });

@@ -9,6 +9,7 @@
  */
 
 const { Router } = require('express');
+const crypto = require('crypto');
 const { default: ical } = require('ical-generator');
 const { pool } = require('../db');
 const { logError } = require('../lib/errors');
@@ -40,6 +41,21 @@ router.get('/:calendar_id.ics', async (req, res) => {
     }
 
     const cal = calResult.rows[0];
+
+    // ETag: cheap fingerprint from latest update time + event count
+    const fingerprint = await pool.query(
+      `SELECT COALESCE(MAX(updated_at), MAX(created_at)) AS latest,
+              COUNT(*) AS cnt
+       FROM events
+       WHERE calendar_id = $1 AND status NOT IN ('cancelled', 'recurring')`,
+      [calendar_id]
+    );
+    const { latest, cnt } = fingerprint.rows[0];
+    const etag = `"${crypto.createHash('md5').update(`${latest}-${cnt}`).digest('hex')}"`;
+
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
 
     // Fetch all non-cancelled, non-parent events for this calendar
     const evtResult = await pool.query(
@@ -101,9 +117,11 @@ router.get('/:calendar_id.ics', async (req, res) => {
 
     res.set('Content-Type', 'text/calendar; charset=utf-8');
     res.set('Content-Disposition', `inline; filename="${calendar_id}.ics"`);
+    res.set('Cache-Control', 'public, max-age=300');
+    res.set('ETag', etag);
     res.send(calendar.toString());
   } catch (err) {
-    await logError(err, { route: 'GET /feeds/:id.ics', method: 'GET' });
+    logError(err, { route: 'GET /feeds/:id.ics', method: 'GET' });
     res.status(500).json({ error: 'Failed to generate feed' });
   }
 });

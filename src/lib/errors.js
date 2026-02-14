@@ -5,7 +5,7 @@
  *   const { logError } = require('../lib/errors');
  *
  *   catch (err) {
- *     await logError(err, { route: 'POST /events', agent_id: req.agent?.id });
+ *     logError(err, { route: 'POST /events', agent_id: req.agent?.id });
  *     res.status(500).json({ error: 'Failed to create event' });
  *   }
  */

@@ -11,8 +11,8 @@ const router = Router();
 const DOMAIN = process.env.CALDAVE_DOMAIN || 'caldave.ai';
 const EMAIL_DOMAIN = process.env.CALDAVE_EMAIL_DOMAIN || 'invite.caldave.ai';
 
-router.get('/', (req, res) => {
-  const html = `<!DOCTYPE html>
+// Pre-compute static HTML at module load (never changes at runtime)
+const cachedHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -873,7 +873,9 @@ Daily standup  2026-02-13 16:00:00Z  ...
 </body>
 </html>`;
 
-  res.send(html);
+router.get('/', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(cachedHtml);
 });
 
 module.exports = router;

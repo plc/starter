@@ -29,6 +29,9 @@ async function initSchema() {
       created_at      timestamptz NOT NULL DEFAULT now()
     );
 
+    -- Fast auth lookup (every authenticated request queries by api_key_hash)
+    CREATE INDEX IF NOT EXISTS idx_agents_api_key_hash ON agents (api_key_hash);
+
     CREATE TABLE IF NOT EXISTS calendars (
       id              text PRIMARY KEY,
       agent_id        text NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
