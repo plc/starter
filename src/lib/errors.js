@@ -11,6 +11,7 @@
  */
 
 const { pool } = require('../db');
+const { notify } = require('./notify');
 
 /**
  * Log an error to the error_log table. Never throws — falls back to console.error.
@@ -28,6 +29,7 @@ async function logError(err, ctx = {}) {
 
   // Always log to console too
   console.error(ctx.route || 'Error:', message);
+  notify('error', { route: ctx.route || 'unknown', message, agent_id: ctx.agent_id || 'n/a' });
 
   try {
     await pool.query(

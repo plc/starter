@@ -16,6 +16,7 @@
 
 const { default: ical } = require('ical-generator');
 const { pool } = require('../db');
+const { notify } = require('./notify');
 
 let postmarkClient;
 
@@ -82,6 +83,7 @@ async function sendViaSmtp(smtpConfig, params) {
   }
 
   const info = await transporter.sendMail(mailOpts);
+  notify('email_sent', { to: params.to, subject: params.subject, via: params.smtpConfig ? 'agent_smtp' : 'postmark' });
   return { sent: true, messageId: info.messageId };
 }
 

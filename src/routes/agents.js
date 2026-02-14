@@ -17,6 +17,7 @@ const { pool } = require('../db');
 const { agentId, apiKey } = require('../lib/ids');
 const { hashKey } = require('../lib/keys');
 const { logError } = require('../lib/errors');
+const { notify } = require('../lib/notify');
 const auth = require('../middleware/auth');
 
 const router = Router();
@@ -77,6 +78,8 @@ router.post('/', async (req, res) => {
     };
     if (name) response.name = name;
     if (description) response.description = description;
+
+    notify('agent_created', { agent_id: id, name: name || '(unnamed)' });
 
     res.status(201).json(response);
   } catch (err) {
