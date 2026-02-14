@@ -116,6 +116,7 @@ router.get('/', (req, res) => {
       <ul>
         <li><a href="#get-feed">GET /feeds/:id.ics</a> — iCal feed</li>
         <li><a href="#post-inbound">POST /inbound/:token</a> — Inbound email webhook</li>
+        <li><a href="#webhook-verification">Webhook Verification</a> — Signature verification</li>
       </ul>
       <div class="section">Debugging</div>
       <ul>
@@ -441,6 +442,51 @@ router.get('/', (req, res) => {
 }</code></pre>
       <div class="note">The test payload includes <code class="inline-code">type: "test"</code> so your webhook handler can distinguish test pings from real events. If <code class="inline-code">webhook_secret</code> is set, the payload is signed with HMAC-SHA256 via the <code class="inline-code">X-CalDave-Signature</code> header.</div>
     </div>
+
+    <!-- ============================================================ -->
+    <h3 id="webhook-verification">Webhook Verification</h3>
+    <p>When <code class="inline-code">webhook_secret</code> is set on a calendar, CalDave signs every webhook payload with HMAC-SHA256. The hex digest is sent in the <code class="inline-code">X-CalDave-Signature</code> header. Verify it on your server to confirm the request came from CalDave and wasn't tampered with.</p>
+
+    <div class="label">How it works</div>
+    <table class="params"><tbody>
+      <tr><td class="param"><strong>1.</strong></td><td class="param-desc">CalDave computes <code class="inline-code">HMAC-SHA256(webhook_secret, raw_request_body)</code></td></tr>
+      <tr><td class="param"><strong>2.</strong></td><td class="param-desc">The hex digest is sent in <code class="inline-code">X-CalDave-Signature</code></td></tr>
+      <tr><td class="param"><strong>3.</strong></td><td class="param-desc">Your server recomputes the HMAC over the raw body and compares</td></tr>
+    </tbody></table>
+
+    <div class="label">Node.js verification example</div>
+    <pre><code>const crypto = require('crypto');
+
+// Use the raw body string, NOT parsed JSON
+const signature = req.headers['x-caldave-signature'];
+const expected = crypto
+  .createHmac('sha256', WEBHOOK_SECRET)
+  .update(rawBody)
+  .digest('hex');
+
+const valid = crypto.timingSafeEqual(
+  Buffer.from(expected),
+  Buffer.from(signature)
+);
+
+if (!valid) {
+  return res.status(401).json({ error: 'Invalid signature' });
+}</code></pre>
+
+    <div class="label">Python verification example</div>
+    <pre><code>import hmac, hashlib
+
+signature = request.headers.get('X-CalDave-Signature')
+expected = hmac.new(
+    WEBHOOK_SECRET.encode(),
+    request.data,  # raw bytes
+    hashlib.sha256
+).hexdigest()
+
+if not hmac.compare_digest(expected, signature):
+    abort(401)</code></pre>
+
+    <div class="note">Always verify against the <strong>raw request body</strong> (the exact bytes received), not re-serialized JSON. Use constant-time comparison (<code class="inline-code">timingSafeEqual</code> / <code class="inline-code">compare_digest</code>) to prevent timing attacks. If no <code class="inline-code">webhook_secret</code> is set, the header is omitted and payloads are unsigned.</div>
 
     <!-- ============================================================ -->
     <h2 id="events">Events</h2>

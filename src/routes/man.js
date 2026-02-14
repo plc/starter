@@ -626,6 +626,13 @@ router.get('/', softAuth, async (req, res) => {
         base_url: BASE,
         rate_limits: { api: '1000/min', agent_creation: '20/hour', inbound: '60/min' },
         error_format: ERROR_FORMAT,
+        webhook_verification: {
+          header: 'X-CalDave-Signature',
+          algorithm: 'HMAC-SHA256(webhook_secret, raw_request_body)',
+          format: 'hex digest',
+          note: 'Set webhook_secret on a calendar via POST/PATCH /calendars. Use constant-time comparison (crypto.timingSafeEqual or hmac.compare_digest). Verify against the raw body string, not re-serialized JSON.',
+          docs: BASE + '/docs#webhook-verification',
+        },
         your_context: context,
         recommended_next_step: recommendation,
         discover_more: {
@@ -707,6 +714,13 @@ router.get('/', softAuth, async (req, res) => {
         headers: 'RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset (RFC draft-7)',
       },
       error_format: ERROR_FORMAT,
+      webhook_verification: {
+        header: 'X-CalDave-Signature',
+        algorithm: 'HMAC-SHA256(webhook_secret, raw_request_body)',
+        format: 'hex digest',
+        note: 'Set webhook_secret on a calendar via POST/PATCH /calendars. Use constant-time comparison (crypto.timingSafeEqual or hmac.compare_digest). Verify against the raw body string, not re-serialized JSON.',
+        docs: BASE + '/docs#webhook-verification',
+      },
       your_context: context,
       recommended_next_step: recommendation,
       endpoints,
