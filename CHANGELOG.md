@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **SMTP integration for outbound emails** — configure your own SMTP server via `PUT /agents/smtp` so calendar invites and RSVP replies are sent from your email address instead of CalDave's built-in delivery. New `GET /agents/smtp` (view config, password excluded) and `DELETE /agents/smtp` (revert to built-in). `GET /agents/me` now includes `smtp_configured` boolean. Supports any SMTP provider (AgentMail, SendGrid, Gmail, etc.).
 - **Webhook test endpoint** — `POST /calendars/:id/webhook/test` sends a test payload to the calendar's configured webhook URL and returns the HTTP status code. Supports HMAC-SHA256 signing via `X-CalDave-Signature` when `webhook_secret` is set.
 - **Welcome event opt-out** — `POST /calendars` now accepts `welcome_event: false` to skip the auto-created welcome event. Default remains true.
 - **Rate limit documentation** — rate limits documented in `/docs` and included in `POST /man` responses. All responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers (RFC draft-7).

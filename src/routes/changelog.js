@@ -123,6 +123,13 @@ const CHANGELOG = [
     changes: [
       {
         type: 'feature',
+        title: 'SMTP integration for outbound emails',
+        description: 'Configure your own SMTP server via PUT /agents/smtp so calendar invites and RSVP replies are sent from your email address instead of CalDave built-in delivery. Supports any SMTP provider (AgentMail, SendGrid, Gmail, etc.).',
+        endpoints: ['PUT /agents/smtp', 'GET /agents/smtp', 'DELETE /agents/smtp'],
+        docs: BASE + '/docs#put-smtp',
+      },
+      {
+        type: 'feature',
         title: 'Webhook test endpoint',
         description: 'POST /calendars/:id/webhook/test sends a test payload to your configured webhook URL and returns the HTTP status code. Verifies webhook configuration before real events fire. Supports HMAC-SHA256 signing.',
         endpoints: ['POST /calendars/:id/webhook/test'],

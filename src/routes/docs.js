@@ -87,6 +87,9 @@ router.get('/', (req, res) => {
         <li><a href="#post-agents">POST /agents</a> — Create agent</li>
         <li><a href="#get-agents-me">GET /agents/me</a> — Get agent profile</li>
         <li><a href="#patch-agents">PATCH /agents</a> — Update agent</li>
+        <li><a href="#put-smtp">PUT /agents/smtp</a> — Configure SMTP</li>
+        <li><a href="#get-smtp">GET /agents/smtp</a> — View SMTP config</li>
+        <li><a href="#delete-smtp">DELETE /agents/smtp</a> — Remove SMTP config</li>
       </ul>
       <div class="section">Calendars</div>
       <ul>
@@ -213,6 +216,63 @@ router.get('/', (req, res) => {
   "created_at": "2026-02-14T10:30:00.000Z"
 }</code></pre>
       <div class="note">When an agent has a name, outbound invite and RSVP reply emails use it as the From display name (e.g. "Meeting Scheduler" &lt;cal-xxx@${EMAIL_DOMAIN}&gt;).</div>
+    </div>
+
+    <div class="endpoint" id="put-smtp">
+      <div class="method-path">
+        <span class="method post">PUT</span>
+        <span class="path">/agents/smtp</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Configure an SMTP server for outbound emails. When set, all invite and RSVP emails for this agent are sent via your SMTP server instead of CalDave's built-in delivery. This lets invites come from your own email address.</p>
+      <div class="label">Body parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">host <span class="param-req">required</span></span><span class="param-desc">SMTP server hostname (e.g. smtp.agentmail.to)</span></div>
+        <div class="param"><span class="param-name">port <span class="param-req">required</span></span><span class="param-desc">SMTP port (465 for SSL, 587 for STARTTLS)</span></div>
+        <div class="param"><span class="param-name">username <span class="param-req">required</span></span><span class="param-desc">SMTP auth username</span></div>
+        <div class="param"><span class="param-name">password <span class="param-req">required</span></span><span class="param-desc">SMTP auth password (stored securely, never returned in responses)</span></div>
+        <div class="param"><span class="param-name">from <span class="param-req">required</span></span><span class="param-desc">From email address for outbound emails</span></div>
+      </div>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X PUT https://${DOMAIN}/agents/smtp \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -d '{"host": "smtp.agentmail.to", "port": 465, "username": "inbox@agentmail.to", "password": "YOUR_SMTP_PASSWORD", "from": "inbox@agentmail.to"}'</code></pre>
+      <div class="label">Response</div>
+      <pre><code>{
+  "smtp": {
+    "host": "smtp.agentmail.to",
+    "port": 465,
+    "username": "inbox@agentmail.to",
+    "from": "inbox@agentmail.to",
+    "configured": true
+  }
+}</code></pre>
+      <div class="note">Password is never included in responses. When SMTP is configured, the <code class="inline-code">from</code> address replaces the calendar email as the From address on all outbound emails. If your agent has a name, it appears as the display name (e.g. "My Agent" &lt;inbox@agentmail.to&gt;).</div>
+    </div>
+
+    <div class="endpoint" id="get-smtp">
+      <div class="method-path">
+        <span class="method get">GET</span>
+        <span class="path">/agents/smtp</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">View the current SMTP configuration (password excluded).</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s https://${DOMAIN}/agents/smtp \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+    </div>
+
+    <div class="endpoint" id="delete-smtp">
+      <div class="method-path">
+        <span class="method delete">DELETE</span>
+        <span class="path">/agents/smtp</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Remove the SMTP configuration. Outbound emails revert to CalDave's built-in delivery.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X DELETE https://${DOMAIN}/agents/smtp \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
     <!-- ============================================================ -->

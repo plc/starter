@@ -145,6 +145,13 @@ async function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_error_log_created
       ON error_log (created_at DESC);
+
+    -- Agent SMTP configuration (optional, replaces Postmark when set)
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_host text;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_port integer;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_user text;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_pass text;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_from text;
   `);
 
   // Backfill inbound_token for existing calendars that don't have one

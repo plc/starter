@@ -119,7 +119,7 @@ async function getCalendar(calendarId) {
  * Fire-and-forget: send outbound invite to attendees and update tracking columns.
  * Does not block the API response. Errors are logged, not thrown.
  */
-function fireInvite(event, calendarId, agentName) {
+function fireInvite(event, calendarId, agentId, agentName) {
   const attendees = parseAttendees(event.attendees);
   if (attendees.length === 0) return;
 
@@ -141,7 +141,7 @@ function fireInvite(event, calendarId, agentName) {
         event.ical_uid = icalUid;
       }
 
-      const result = await sendInviteEmail(event, calendar, attendees, { agentName });
+      const result = await sendInviteEmail(event, calendar, attendees, { agentId, agentName });
       if (result.sent) {
         await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [event.id]);
       } else {
@@ -282,7 +282,7 @@ router.post('/:id/events', async (req, res) => {
       await updateMaterializedUntil(pool, parentEvent.id, horizon);
 
       // Send outbound invite for the series (once, using parent event data)
-      fireInvite(parentEvent, req.params.id, req.agent.name);
+      fireInvite(parentEvent, req.params.id, req.agent.id, req.agent.name);
 
       return res.status(201).json({
         ...formatEvent(parentEvent),
@@ -311,7 +311,7 @@ router.post('/:id/events', async (req, res) => {
     );
 
     // Send outbound invite if event has attendees
-    fireInvite(rows[0], req.params.id, req.agent.name);
+    fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
 
     res.status(201).json(formatEvent(rows[0]));
   } catch (err) {
@@ -530,7 +530,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
 
       // Send outbound invite if attendees changed on this instance
       if (attendees !== undefined) {
-        fireInvite(rows[0], req.params.id, req.agent.name);
+        fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
       }
 
       return res.json(formatEvent(rows[0]));
@@ -604,7 +604,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
                 await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [uid, updatedParent.id]);
                 updatedParent.ical_uid = uid;
               }
-              const result = await sendInviteEmail(updatedParent, calendar, parseAttendees(updatedParent.attendees), { agentName: req.agent.name });
+              const result = await sendInviteEmail(updatedParent, calendar, parseAttendees(updatedParent.attendees), { agentId: req.agent.id, agentName: req.agent.name });
               if (result.sent) {
                 await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
               } else {
@@ -666,7 +666,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
                 await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedParent.id]);
                 updatedParent.ical_sequence = seq;
                 console.log('[outbound] Sending updated invite (seq=%d) to all %d attendees', seq, newAttendees.length);
-                const result = await sendInviteEmail(updatedParent, calendar, newAttendees, { agentName: req.agent.name });
+                const result = await sendInviteEmail(updatedParent, calendar, newAttendees, { agentId: req.agent.id, agentName: req.agent.name });
                 if (result.sent) {
                   await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
                 } else {
@@ -677,7 +677,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
                 const added = newAttendees.filter((e) => !oldAttendees.includes(e));
                 if (added.length > 0) {
                   console.log('[outbound] Sending invite to %d new attendees: %s', added.length, added.join(','));
-                  const result = await sendInviteEmail(updatedParent, calendar, added, { agentName: req.agent.name });
+                  const result = await sendInviteEmail(updatedParent, calendar, added, { agentId: req.agent.id, agentName: req.agent.name });
                   if (result.sent) {
                     await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
                   } else {
@@ -752,7 +752,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
             await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedEvt.id]);
             updatedEvt.ical_sequence = seq;
             console.log('[outbound] Sending updated invite (seq=%d) to all %d attendees', seq, newAttendees.length);
-            const result = await sendInviteEmail(updatedEvt, calendar, newAttendees, { agentName: req.agent.name });
+            const result = await sendInviteEmail(updatedEvt, calendar, newAttendees, { agentId: req.agent.id, agentName: req.agent.name });
             if (result.sent) {
               await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvt.id]);
             } else {
@@ -763,7 +763,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
             const added = newAttendees.filter((e) => !oldAttendees.includes(e));
             if (added.length > 0) {
               console.log('[outbound] Sending invite to %d new attendees: %s', added.length, added.join(','));
-              const result = await sendInviteEmail(updatedEvt, calendar, added, { agentName: req.agent.name });
+              const result = await sendInviteEmail(updatedEvt, calendar, added, { agentId: req.agent.id, agentName: req.agent.name });
               if (result.sent) {
                 await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvt.id]);
               } else {
@@ -946,7 +946,7 @@ router.post('/:id/events/:event_id/respond', async (req, res) => {
             console.error('[outbound] Calendar not found: %s (skipping reply for event %s)', req.params.id, updatedEvent.id);
             return;
           }
-          const result = await sendReplyEmail(updatedEvent, calendar, response, { agentName: req.agent.name });
+          const result = await sendReplyEmail(updatedEvent, calendar, response, { agentId: req.agent.id, agentName: req.agent.name });
           if (result.sent) {
             await pool.query('UPDATE events SET reply_sent = $1 WHERE id = $2', [response, updatedEvent.id]);
           } else {

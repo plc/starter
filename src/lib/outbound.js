@@ -10,11 +10,12 @@
  * Exports:
  *   generateInviteIcs(event, calendar)           — METHOD:REQUEST .ics string
  *   generateReplyIcs(event, calendar, response)   — METHOD:REPLY .ics string
- *   sendInviteEmail(event, calendar, recipients)  — send invite via Postmark
- *   sendReplyEmail(event, calendar, response)     — send RSVP reply via Postmark
+ *   sendInviteEmail(event, calendar, recipients)  — send invite via SMTP or Postmark
+ *   sendReplyEmail(event, calendar, response)     — send RSVP reply via SMTP or Postmark
  */
 
 const { default: ical } = require('ical-generator');
+const { pool } = require('../db');
 
 let postmarkClient;
 
@@ -32,6 +33,56 @@ function getPostmarkClient() {
   const postmark = require('postmark');
   postmarkClient = new postmark.ServerClient(token);
   return postmarkClient;
+}
+
+/**
+ * Look up the agent's SMTP configuration from the database.
+ * Returns { host, port, user, pass, from } or null if not configured.
+ */
+async function getAgentSmtpConfig(agentId) {
+  if (!agentId) return null;
+  const { rows } = await pool.query(
+    'SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from FROM agents WHERE id = $1',
+    [agentId]
+  );
+  if (rows.length === 0 || !rows[0].smtp_host) return null;
+  const r = rows[0];
+  return { host: r.smtp_host, port: r.smtp_port, user: r.smtp_user, pass: r.smtp_pass, from: r.smtp_from };
+}
+
+/**
+ * Send an email via SMTP using nodemailer.
+ *
+ * @param {Object} smtpConfig — { host, port, user, pass, from }
+ * @param {Object} params     — { from, to, subject, textBody, icsAttachment: { name, content, contentType } }
+ * @returns {Promise<{ sent: boolean, reason?: string, messageId?: string }>}
+ */
+async function sendViaSmtp(smtpConfig, params) {
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.port === 465,
+    auth: { user: smtpConfig.user, pass: smtpConfig.pass },
+  });
+
+  const mailOpts = {
+    from: params.from,
+    to: params.to,
+    subject: params.subject,
+    text: params.textBody,
+  };
+
+  if (params.icsAttachment) {
+    mailOpts.attachments = [{
+      filename: params.icsAttachment.name,
+      content: params.icsAttachment.content,
+      contentType: params.icsAttachment.contentType,
+    }];
+  }
+
+  const info = await transporter.sendMail(mailOpts);
+  return { sent: true, messageId: info.messageId };
 }
 
 /**
@@ -143,20 +194,49 @@ function generateReplyIcs(event, calendar, response) {
  * @returns {Promise<{ sent: boolean, reason?: string, icalUid?: string }>}
  */
 async function sendInviteEmail(event, calendar, recipientEmails, options = {}) {
-  const client = getPostmarkClient();
-  if (!client) {
-    console.log('[outbound] Skipping invite (no POSTMARK_SERVER_TOKEN): event=%s', event.id);
-    return { sent: false, reason: 'no_postmark_token' };
-  }
-
   if (!recipientEmails || recipientEmails.length === 0) {
     console.log('[outbound] Skipping invite (no recipients): event=%s', event.id);
     return { sent: false, reason: 'no_recipients' };
   }
 
   const { icsString, icalUid } = generateInviteIcs(event, calendar);
-
   const to = recipientEmails.join(',');
+  const subject = 'Invitation: ' + event.title;
+  const textBody = [
+    'You have been invited to: ' + event.title,
+    '',
+    'Start: ' + event.start_time,
+    'End: ' + event.end_time,
+    event.location ? 'Location: ' + event.location : null,
+    event.description ? '' : null,
+    event.description || null,
+  ].filter((l) => l !== null).join('\n');
+
+  // Check for agent SMTP configuration
+  const smtpConfig = await getAgentSmtpConfig(options.agentId);
+  if (smtpConfig) {
+    const from = options.agentName ? '"' + options.agentName + '" <' + smtpConfig.from + '>' : smtpConfig.from;
+    console.log('[outbound] Sending invite via SMTP: event=%s from=%s to=%s title="%s"', event.id, from, to, event.title);
+    try {
+      const result = await sendViaSmtp(smtpConfig, {
+        from, to, subject, textBody,
+        icsAttachment: { name: 'invite.ics', content: icsString, contentType: 'text/calendar; method=REQUEST' },
+      });
+      console.log('[outbound] ✓ Invite sent via SMTP: event=%s messageId=%s to=%s', event.id, result.messageId, to);
+      return { sent: true, icalUid };
+    } catch (err) {
+      console.error('[outbound] ✗ SMTP invite FAILED: event=%s to=%s error=%s', event.id, to, err.message);
+      return { sent: false, reason: err.message };
+    }
+  }
+
+  // Fall back to Postmark
+  const client = getPostmarkClient();
+  if (!client) {
+    console.log('[outbound] Skipping invite (no email transport): event=%s', event.id);
+    return { sent: false, reason: 'no_email_transport' };
+  }
+
   const from = options.agentName ? '"' + options.agentName + '" <' + calendar.email + '>' : calendar.email;
   console.log('[outbound] Sending invite: event=%s from=%s to=%s title="%s"', event.id, from, to, event.title);
 
@@ -164,16 +244,8 @@ async function sendInviteEmail(event, calendar, recipientEmails, options = {}) {
     const pmResponse = await client.sendEmail({
       From: from,
       To: to,
-      Subject: 'Invitation: ' + event.title,
-      TextBody: [
-        'You have been invited to: ' + event.title,
-        '',
-        'Start: ' + event.start_time,
-        'End: ' + event.end_time,
-        event.location ? 'Location: ' + event.location : null,
-        event.description ? '' : null,
-        event.description || null,
-      ].filter((l) => l !== null).join('\n'),
+      Subject: subject,
+      TextBody: textBody,
       Attachments: [{
         Name: 'invite.ics',
         Content: Buffer.from(icsString).toString('base64'),
@@ -201,12 +273,6 @@ async function sendInviteEmail(event, calendar, recipientEmails, options = {}) {
  * @returns {Promise<{ sent: boolean, reason?: string }>}
  */
 async function sendReplyEmail(event, calendar, response, options = {}) {
-  const client = getPostmarkClient();
-  if (!client) {
-    console.log('[outbound] Skipping reply (no POSTMARK_SERVER_TOKEN): event=%s', event.id);
-    return { sent: false, reason: 'no_postmark_token' };
-  }
-
   if (!event.organiser_email) {
     console.log('[outbound] Skipping reply (no organiser_email): event=%s', event.id);
     return { sent: false, reason: 'no_organiser_email' };
@@ -219,6 +285,33 @@ async function sendReplyEmail(event, calendar, response, options = {}) {
 
   const icsString = generateReplyIcs(event, calendar, response);
   const statusLabel = response.charAt(0).toUpperCase() + response.slice(1);
+  const subject = statusLabel + ': ' + event.title;
+  const textBody = calendar.name + ' has ' + response + ' the invitation: ' + event.title;
+
+  // Check for agent SMTP configuration
+  const smtpConfig = await getAgentSmtpConfig(options.agentId);
+  if (smtpConfig) {
+    const from = options.agentName ? '"' + options.agentName + '" <' + smtpConfig.from + '>' : smtpConfig.from;
+    console.log('[outbound] Sending %s reply via SMTP: event=%s from=%s to=%s title="%s"', response, event.id, from, event.organiser_email, event.title);
+    try {
+      const result = await sendViaSmtp(smtpConfig, {
+        from, to: event.organiser_email, subject, textBody,
+        icsAttachment: { name: 'response.ics', content: icsString, contentType: 'text/calendar; method=REPLY' },
+      });
+      console.log('[outbound] ✓ Reply sent via SMTP: event=%s response=%s messageId=%s to=%s', event.id, response, result.messageId, event.organiser_email);
+      return { sent: true };
+    } catch (err) {
+      console.error('[outbound] ✗ SMTP reply FAILED: event=%s response=%s to=%s error=%s', event.id, response, event.organiser_email, err.message);
+      return { sent: false, reason: err.message };
+    }
+  }
+
+  // Fall back to Postmark
+  const client = getPostmarkClient();
+  if (!client) {
+    console.log('[outbound] Skipping reply (no email transport): event=%s', event.id);
+    return { sent: false, reason: 'no_email_transport' };
+  }
 
   const from = options.agentName ? '"' + options.agentName + '" <' + calendar.email + '>' : calendar.email;
   console.log('[outbound] Sending %s reply: event=%s from=%s to=%s title="%s"', response, event.id, from, event.organiser_email, event.title);
@@ -227,8 +320,8 @@ async function sendReplyEmail(event, calendar, response, options = {}) {
     const pmResponse = await client.sendEmail({
       From: from,
       To: event.organiser_email,
-      Subject: statusLabel + ': ' + event.title,
-      TextBody: calendar.name + ' has ' + response + ' the invitation: ' + event.title,
+      Subject: subject,
+      TextBody: textBody,
       Attachments: [{
         Name: 'response.ics',
         Content: Buffer.from(icsString).toString('base64'),
