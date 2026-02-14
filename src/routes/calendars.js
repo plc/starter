@@ -129,7 +129,7 @@ router.post('/', async (req, res) => {
       ical_feed_url: `https://${DOMAIN}/feeds/${id}.ics?token=${token}`,
       feed_token: token,
       inbound_webhook_url: inboundUrl,
-      message: `This calendar can receive invites at ${email}. Forward emails to ${inboundUrl}. Save this information.`,
+      message: `This calendar can receive invites at ${email}. Forward emails to ${inboundUrl}. Save this information. To welcome you to CalDave we auto-added an event to your calendar asking for feedback — hope that is okay!`,
     });
   } catch (err) {
     await logError(err, { route: 'POST /calendars', method: 'POST', agent_id: req.agent?.id });
