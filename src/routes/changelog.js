@@ -123,6 +123,41 @@ const CHANGELOG = [
     changes: [
       {
         type: 'feature',
+        title: 'SMTP test endpoint',
+        description: 'POST /agents/smtp/test sends a test email to verify your SMTP configuration works. Sends to the configured from address and reports success/failure with details.',
+        endpoints: ['POST /agents/smtp/test'],
+        docs: BASE + '/docs#post-smtp-test',
+      },
+      {
+        type: 'feature',
+        title: 'SMTP secure field',
+        description: 'PUT /agents/smtp now accepts an optional secure boolean to explicitly control TLS mode. Use true for implicit TLS (port 465) or false for STARTTLS (port 587). Auto-detected from port if omitted.',
+        endpoints: ['PUT /agents/smtp'],
+        docs: BASE + '/docs#put-smtp',
+      },
+      {
+        type: 'feature',
+        title: 'Webhook config at calendar creation',
+        description: 'POST /calendars now accepts webhook_url, webhook_secret, and webhook_offsets so you can configure webhooks in a single call instead of a separate PATCH.',
+        endpoints: ['POST /calendars'],
+        docs: BASE + '/docs#post-calendars',
+      },
+      {
+        type: 'feature',
+        title: 'email_sent in event responses',
+        description: 'POST and PATCH event endpoints now return email_sent: true/false when the event has attendees, confirming whether the invite was dispatched.',
+        endpoints: ['POST /calendars/:id/events', 'PATCH /calendars/:id/events/:event_id'],
+        docs: BASE + '/docs#post-events',
+      },
+      {
+        type: 'improvement',
+        title: 'GET /man (was POST)',
+        description: 'The machine-readable API manual is now GET /man instead of POST /man. GET is cacheable, browser-friendly, and conventional for read-only endpoints. The ?guide query param still works.',
+        endpoints: ['GET /man'],
+        docs: BASE + '/docs#get-man',
+      },
+      {
+        type: 'feature',
         title: 'SMTP integration for outbound emails',
         description: 'Configure your own SMTP server via PUT /agents/smtp so calendar invites and RSVP replies are sent from your email address instead of CalDave built-in delivery. Supports any SMTP provider (AgentMail, SendGrid, Gmail, etc.).',
         endpoints: ['PUT /agents/smtp', 'GET /agents/smtp', 'DELETE /agents/smtp'],
@@ -145,8 +180,8 @@ const CHANGELOG = [
       {
         type: 'improvement',
         title: 'Rate limit documentation',
-        description: 'Rate limits are now documented in /docs and included in POST /man responses. All responses include RateLimit-Limit, RateLimit-Remaining, and RateLimit-Reset headers (RFC draft-7).',
-        endpoints: ['GET /docs', 'POST /man'],
+        description: 'Rate limits are now documented in /docs and included in GET /man responses. All responses include RateLimit-Limit, RateLimit-Remaining, and RateLimit-Reset headers (RFC draft-7).',
+        endpoints: ['GET /docs', 'GET /man'],
         docs: BASE + '/docs#auth',
       },
     ],
@@ -265,8 +300,8 @@ const CHANGELOG = [
       {
         type: 'feature',
         title: 'Machine-readable API manual',
-        description: 'POST /man returns a JSON document describing all endpoints with curl examples. Supports optional Bearer auth for personalized context and recommended next steps.',
-        endpoints: ['POST /man'],
+        description: 'GET /man returns a JSON document describing all endpoints with curl examples. Supports optional Bearer auth for personalized context and recommended next steps.',
+        endpoints: ['GET /man'],
         docs: BASE + '/docs',
       },
       {

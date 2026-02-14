@@ -46,22 +46,22 @@ The database and schema are created automatically.
 
 ```bash
 # Create an agent (returns API key — save it!)
-curl -s -X POST http://127.0.0.1:3720/agents | jq
+curl -s -X POST "http://127.0.0.1:3720/agents" | jq
 
 # Create a calendar
-curl -s -X POST http://127.0.0.1:3720/calendars \
+curl -s -X POST "http://127.0.0.1:3720/calendars" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"name": "Work Schedule", "timezone": "America/Denver"}' | jq
 
 # Create an event
-curl -s -X POST http://127.0.0.1:3720/calendars/CAL_ID/events \
+curl -s -X POST "http://127.0.0.1:3720/calendars/CAL_ID/events" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"title": "Daily standup", "start": "2025-03-01T09:00:00-07:00", "end": "2025-03-01T09:15:00-07:00"}' | jq
 
 # Check upcoming events
-curl -s http://127.0.0.1:3720/calendars/CAL_ID/upcoming \
+curl -s "http://127.0.0.1:3720/calendars/CAL_ID/upcoming" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq
 ```
 

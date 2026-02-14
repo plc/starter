@@ -7,14 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **SMTP test endpoint** — `POST /agents/smtp/test` sends a test email to verify your SMTP configuration works. Sends to the configured `from` address and reports success/failure with the SMTP error message if any.
+- **SMTP `secure` field** — `PUT /agents/smtp` now accepts an optional `secure` boolean to explicitly control TLS mode. Use `true` for implicit TLS (port 465) or `false` for STARTTLS (port 587). Auto-detected from port when omitted.
+- **Webhook config at calendar creation** — `POST /calendars` now accepts `webhook_url`, `webhook_secret`, and `webhook_offsets` at creation time, saving a separate `PATCH` call.
+- **`email_sent` in event responses** — `POST` and `PATCH` event endpoints now return `email_sent: true/false` when the event has attendees, confirming whether the invite was dispatched. Invites are now sent synchronously before the response is returned.
 - **SMTP integration for outbound emails** — configure your own SMTP server via `PUT /agents/smtp` so calendar invites and RSVP replies are sent from your email address instead of CalDave's built-in delivery. New `GET /agents/smtp` (view config, password excluded) and `DELETE /agents/smtp` (revert to built-in). `GET /agents/me` now includes `smtp_configured` boolean. Supports any SMTP provider (AgentMail, SendGrid, Gmail, etc.).
 - **Webhook test endpoint** — `POST /calendars/:id/webhook/test` sends a test payload to the calendar's configured webhook URL and returns the HTTP status code. Supports HMAC-SHA256 signing via `X-CalDave-Signature` when `webhook_secret` is set.
 - **Welcome event opt-out** — `POST /calendars` now accepts `welcome_event: false` to skip the auto-created welcome event. Default remains true.
-- **Rate limit documentation** — rate limits documented in `/docs` and included in `POST /man` responses. All responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers (RFC draft-7).
-- **Agent name/description prominence** — `POST /agents` docs and quickstart now recommend including `name` and `description` at creation time. `POST /man` recommends naming your agent as the first step for unnamed agents. New `recommended` badge on params.
+- **Rate limit documentation** — rate limits documented in `/docs` and included in `GET /man` responses. All responses include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers (RFC draft-7).
+- **Agent name/description prominence** — `POST /agents` docs and quickstart now recommend including `name` and `description` at creation time. `GET /man` recommends naming your agent as the first step for unnamed agents. New `recommended` badge on params.
 - **Personalized recommendations in changelog** — `GET /changelog` with auth now includes a `recommendations` array with actionable suggestions based on agent state (e.g. name your agent, create your first calendar, add a description).
 - **API changelog endpoint** — `GET /changelog` returns a structured list of API changes with dates and docs links. With optional Bearer auth, highlights changes introduced since the agent was created. Designed for agents to poll ~weekly.
-- **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `POST /man` context.
+- **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `GET /man` context.
 - **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through the inbound webhook.
 - **Agent name in outbound emails** — when an agent has a name set (via `PATCH /agents`), outbound invite and RSVP reply emails use `"Agent Name" <calendar-email>` as the From address, so recipients see a friendly display name instead of just the calendar email.
 - **Outbound RSVP replies** — when an agent responds to an inbound invite via `POST /respond`, CalDave sends a METHOD:REPLY iCal email back to the organiser with the agent's acceptance, decline, or tentative status.
@@ -28,12 +32,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Welcome event on new calendars** — new calendars automatically get a "Send Peter feedback" event at 9am the next day (in the calendar's timezone), with an invite sent to peter.clark@gmail.com.
 - **Terms of Service and Privacy Policy** — new `/terms` and `/privacy` pages with footer links on landing, docs, and quickstart pages.
 
+### Changed
+- **`GET /man` (was `POST /man`)** — the machine-readable API manual is now a GET endpoint. GET is cacheable, browser-friendly, and conventional for read-only endpoints. The `?guide` query param still works. All docs, tests, and examples updated.
+
 ### Fixed
-- **Docs placeholder standardization** — all curl examples in `/docs` now use consistent `UPPER_SNAKE_CASE` placeholders (`YOUR_API_KEY`, `CAL_ID`, `EVT_ID`, `FEED_TOKEN`) with gold highlighting. Added placeholder legend, error endpoints (`GET /errors`, `GET /errors/:id`), and fixed agent description max length (1024, not 1000). Fixed `POST /man` respond example (`email_sent` field, not `response_sent`).
-- **API docs updated** — `/docs` page now documents `GET /agents/me`, `PATCH /agents`, agent `name`/`description` fields on `POST /agents`, `GET /changelog`, and `POST /man`. Table of contents updated with Agents and Discovery sections.
-- **JSON 404 catch-all** — unmatched routes now return `{"error": "Not found. Try POST /man for the API reference."}` instead of Express's default HTML page.
-- **Guide mode discoverability** — `POST /man?guide` now includes a `discover_more` object pointing to the full API reference, changelog, and agent update endpoint so agents don't have to guess at available endpoints.
-- **Welcome event in /man recommendation** — `POST /man` recommendation logic now accounts for the auto-created welcome event (same fix as changelog recommendations).
+- **Curl URL quoting** — all curl examples across docs, homepage, quickstart, `/man`, README, and spec files now wrap URLs in double quotes for shell safety (especially URLs with `?` query parameters).
+- **`/man` guide mode agent creation** — the recommended next step for unauthenticated agents now includes `name` and `description` params in the example curl body, so agents set their identity from the start.
+- **Docs placeholder standardization** — all curl examples in `/docs` now use consistent `UPPER_SNAKE_CASE` placeholders (`YOUR_API_KEY`, `CAL_ID`, `EVT_ID`, `FEED_TOKEN`) with gold highlighting. Added placeholder legend, error endpoints (`GET /errors`, `GET /errors/:id`), and fixed agent description max length (1024, not 1000). Fixed `GET /man` respond example (`email_sent` field, not `response_sent`).
+- **API docs updated** — `/docs` page now documents `GET /agents/me`, `PATCH /agents`, agent `name`/`description` fields on `POST /agents`, `GET /changelog`, and `GET /man`. Table of contents updated with Agents and Discovery sections.
+- **JSON 404 catch-all** — unmatched routes now return `{"error": "Not found. Try GET /man for the API reference."}` instead of Express's default HTML page.
+- **Guide mode discoverability** — `GET /man?guide` now includes a `discover_more` object pointing to the full API reference, changelog, and agent update endpoint so agents don't have to guess at available endpoints.
+- **Welcome event in /man recommendation** — `GET /man` recommendation logic now accounts for the auto-created welcome event (same fix as changelog recommendations).
 - **Agent creation rate limiter scope** — the strict agent creation rate limiter (POST /agents) no longer applies to GET /agents/me and PATCH /agents, which now use the general API rate limiter instead.
 - **`trust proxy` for Fly.io** — set `app.set('trust proxy', 1)` so `express-rate-limit` correctly identifies clients behind Fly's reverse proxy. Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation errors on every cold start.
 - **Improved outbound email logging** — all outbound email operations now log with `[outbound]` prefix including Postmark message IDs on success and status codes on failure.
@@ -48,7 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Inbound REQUEST after CANCEL** — when an organiser moves or re-sends an invite that was previously cancelled, the event is now un-cancelled (recurring events reset to `recurring` with rematerialized instances; non-recurring events reset to `tentative`)
 - **Calendar email domain** — calendar emails now correctly use `@invite.caldave.ai` (Postmark inbound domain) instead of `@caldave.ai`
 - **MCP server instructions** — the MCP server now sends a detailed `instructions` string during initialization, giving AI agents full context about CalDave's workflow, inbound email, recurring events, metadata, and tool usage guidance
-- **Machine-readable API manual** (`POST /man`) — JSON endpoint describing all CalDave API endpoints, with optional Bearer auth for personalized context. Returns real calendar IDs, event counts, and recommended next steps for authenticated agents. Designed for AI agent consumption.
+- **Machine-readable API manual** (`GET /man`) — JSON endpoint describing all CalDave API endpoints, with optional Bearer auth for personalized context. Returns real calendar IDs, event counts, and recommended next steps for authenticated agents. Designed for AI agent consumption.
 - **CalDave v1 core API** — calendar-as-a-service for AI agents
 - Agent provisioning (`POST /agents`) with API key generation (nanoid + SHA-256 hash)
 - Bearer token authentication middleware

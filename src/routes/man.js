@@ -1,7 +1,7 @@
 /**
  * Machine-readable API manual
  *
- * POST /man — returns JSON describing all CalDave endpoints.
+ * GET /man — returns JSON describing all CalDave endpoints.
  * Auth is optional: if a valid Bearer token is provided, the response
  * includes the agent's real calendar IDs, event counts, and personalized
  * curl examples with a recommended next step.
@@ -61,9 +61,9 @@ function buildCurl(method, path, { apiKey, calId, evtId, body, queryString } = {
 
   const parts = [];
   if (method === 'GET') {
-    parts.push(`curl -s ${url}`);
+    parts.push(`curl -s "${url}"`);
   } else {
-    parts.push(`curl -s -X ${method} ${url}`);
+    parts.push(`curl -s -X ${method} "${url}"`);
   }
 
   if (apiKey) {
@@ -144,9 +144,10 @@ function getEndpoints() {
         { name: 'username', in: 'body', required: true, type: 'string', description: 'SMTP auth username' },
         { name: 'password', in: 'body', required: true, type: 'string', description: 'SMTP auth password (never returned in responses)' },
         { name: 'from', in: 'body', required: true, type: 'string', description: 'From email address for outbound emails' },
+        { name: 'secure', in: 'body', required: false, type: 'boolean', description: 'Use implicit TLS (true) or STARTTLS (false). Defaults to true for port 465, false otherwise.' },
       ],
       example_body: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', password: '...', from: 'inbox@agentmail.to' },
-      example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', configured: true } },
+      example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', secure: true, configured: true } },
     },
     {
       method: 'GET',
@@ -155,7 +156,7 @@ function getEndpoints() {
       auth: 'bearer',
       parameters: [],
       example_body: null,
-      example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', configured: true } },
+      example_response: { smtp: { host: 'smtp.agentmail.to', port: 465, username: 'inbox@agentmail.to', from: 'inbox@agentmail.to', secure: true, configured: true } },
     },
     {
       method: 'DELETE',
@@ -168,6 +169,15 @@ function getEndpoints() {
     },
     {
       method: 'POST',
+      path: '/agents/smtp/test',
+      description: 'Send a test email to verify SMTP configuration works. Sends to the configured from address.',
+      auth: 'bearer',
+      parameters: [],
+      example_body: null,
+      example_response: { success: true, message_id: '<...>', from: 'inbox@agentmail.to', message: 'Test email sent successfully.' },
+    },
+    {
+      method: 'GET',
       path: '/man',
       description: 'This endpoint. Machine-readable API manual with optional personalized context. Add ?guide to skip the full endpoint catalog.',
       auth: 'none (optional bearer)',
@@ -199,7 +209,10 @@ function getEndpoints() {
         { name: 'name', in: 'body', required: true, type: 'string', description: 'Calendar display name' },
         { name: 'timezone', in: 'body', required: false, type: 'string', description: 'IANA timezone (default: UTC)' },
         { name: 'agentmail_api_key', in: 'body', required: false, type: 'string', description: 'AgentMail API key for inbound email attachments' },
-        { name: 'welcome_event', in: 'body', required: false, type: 'boolean', description: 'Set to false to skip the auto-created welcome event. Defaults to true.' },
+        { name: 'webhook_url', in: 'body', required: false, type: 'string', description: 'URL to receive event webhooks' },
+        { name: 'webhook_secret', in: 'body', required: false, type: 'string', description: 'Secret for HMAC-SHA256 webhook signatures' },
+        { name: 'webhook_offsets', in: 'body', required: false, type: 'array', description: 'Offsets in seconds for pre-event webhook reminders (e.g. [300, 900])' },
+        { name: 'welcome_event', in: 'body', required: false, type: 'boolean', description: 'Set to false to skip the auto-created welcome event (recommended for production). Defaults to true.' },
       ],
       example_body: { name: 'Work Schedule', timezone: 'America/Denver' },
       example_response: {
@@ -450,7 +463,9 @@ function buildRecommendation(context, apiKey, calId) {
       action: 'Create an agent',
       description: 'You are not authenticated. Create an agent to get an API key, then pass it as a Bearer token to access all endpoints.',
       endpoint: 'POST /agents',
-      curl: buildCurl('POST', '/agents'),
+      curl: buildCurl('POST', '/agents', {
+        body: { name: 'My Agent', description: 'Brief description of what this agent does' },
+      }),
     };
   }
 
@@ -510,7 +525,7 @@ function buildRecommendation(context, apiKey, calId) {
 // Route handler
 // ---------------------------------------------------------------------------
 
-router.post('/', softAuth, async (req, res) => {
+router.get('/', softAuth, async (req, res) => {
   try {
     const apiKey = 'YOUR_API_KEY';
     const context = {
@@ -557,8 +572,7 @@ router.post('/', softAuth, async (req, res) => {
     const recommendation = buildRecommendation(context, apiKey, calId);
 
     // guide mode: skip the full endpoint catalog
-    // Supports: ?guide query param, or {"guide": true} in body
-    const guide = ('guide' in req.query) || (req.body && req.body.guide);
+    const guide = 'guide' in req.query;
     if (guide) {
       return res.json({
         overview: 'CalDave is a calendar-as-a-service API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.',
@@ -567,7 +581,7 @@ router.post('/', softAuth, async (req, res) => {
         your_context: context,
         recommended_next_step: recommendation,
         discover_more: {
-          full_api_reference: 'POST ' + BASE + '/man (without ?guide) returns all endpoints with curl examples and parameters.',
+          full_api_reference: 'GET ' + BASE + '/man (without ?guide) returns all endpoints with curl examples and parameters.',
           changelog: 'GET ' + BASE + '/changelog (with Bearer auth) shows new features since you signed up and personalized recommendations.',
           update_agent: 'PATCH ' + BASE + '/agents lets you set a name and description for your agent.',
         },
@@ -631,7 +645,7 @@ router.post('/', softAuth, async (req, res) => {
       endpoints,
     });
   } catch (err) {
-    await logError(err, { route: 'POST /man', method: 'POST', agent_id: req.agent?.id });
+    await logError(err, { route: 'GET /man', method: 'GET', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Internal server error' });
   }
 });

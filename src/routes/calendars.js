@@ -54,7 +54,7 @@ function formatCalendar(cal) {
   };
 }
 
-const KNOWN_CALENDAR_POST_FIELDS = new Set(['name', 'timezone', 'agentmail_api_key', 'welcome_event']);
+const KNOWN_CALENDAR_POST_FIELDS = new Set(['name', 'timezone', 'agentmail_api_key', 'welcome_event', 'webhook_url', 'webhook_secret', 'webhook_offsets']);
 const KNOWN_CALENDAR_PATCH_FIELDS = new Set([
   'name', 'timezone', 'webhook_url', 'webhook_secret', 'webhook_offsets', 'agentmail_api_key',
 ]);
@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
     const unknownErr = checkUnknownFields(req.body, KNOWN_CALENDAR_POST_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
-    const { name, timezone, agentmail_api_key, welcome_event } = req.body;
+    const { name, timezone, agentmail_api_key, welcome_event, webhook_url, webhook_secret, webhook_offsets } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -85,6 +85,11 @@ router.post('/', async (req, res) => {
     if (timezone && timezone.length > 64) {
       return res.status(400).json({ error: 'timezone exceeds 64 character limit' });
     }
+    if (webhook_url !== undefined && webhook_url !== null) {
+      try { new URL(webhook_url); } catch {
+        return res.status(400).json({ error: 'webhook_url must be a valid URL' });
+      }
+    }
 
     const id = calendarId();
     const token = feedToken();
@@ -93,9 +98,9 @@ router.post('/', async (req, res) => {
     const tz = timezone || 'UTC';
 
     await pool.query(
-      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token, inbound_token, agentmail_api_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, req.agent.id, name, tz, email, token, inbToken, agentmail_api_key || null]
+      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token, inbound_token, agentmail_api_key, webhook_url, webhook_secret, webhook_offsets)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [id, req.agent.id, name, tz, email, token, inbToken, agentmail_api_key || null, webhook_url || null, webhook_secret || null, webhook_offsets ? JSON.stringify(webhook_offsets) : null]
     );
 
     // Create welcome event unless explicitly opted out

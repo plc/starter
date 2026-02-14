@@ -143,6 +143,44 @@ Update the authenticated agent's metadata. Does not change the API key.
 }
 ```
 
+#### `PUT /agents/smtp`
+Configure SMTP for outbound emails. When set, all invite and RSVP emails are sent via your SMTP server.
+
+**Request:**
+```json
+{
+  "host": "smtp.agentmail.to",
+  "port": 465,
+  "username": "inbox@agentmail.to",
+  "password": "YOUR_SMTP_PASSWORD",
+  "from": "inbox@agentmail.to",
+  "secure": true
+}
+```
+
+All fields except `secure` are required. `secure` defaults to `true` for port 465, `false` otherwise. Use `true` for implicit TLS, `false` for STARTTLS.
+
+**Response:** Returns the config without the password.
+
+#### `GET /agents/smtp`
+View SMTP configuration (password excluded). Returns `null` if not configured.
+
+#### `DELETE /agents/smtp`
+Remove SMTP configuration. Outbound emails revert to CalDave's built-in delivery.
+
+#### `POST /agents/smtp/test`
+Send a test email to verify SMTP configuration works. Sends to the configured `from` address.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message_id": "<abc123@smtp.agentmail.to>",
+  "from": "inbox@agentmail.to",
+  "message": "Test email sent successfully to inbox@agentmail.to."
+}
+```
+
 ---
 
 ### API Changelog
@@ -210,7 +248,7 @@ The `recommendations` array is only present when authenticated and when there ar
 
 ### API Manual
 
-#### `POST /man`
+#### `GET /man`
 Machine-readable API manual. Returns a JSON document describing all CalDave endpoints with curl examples, parameter definitions, and example responses.
 
 Auth is optional. If a valid Bearer token is provided, the response includes the agent's real calendar IDs and event counts, with personalized curl examples and a recommended next step.
@@ -246,9 +284,14 @@ Create a new calendar for the authenticated agent.
 {
   "name": "Work Schedule",
   "timezone": "America/Denver",
-  "agentmail_api_key": "am_xxx..."
+  "webhook_url": "https://example.com/webhook",
+  "webhook_secret": "my_secret",
+  "webhook_offsets": [300, 900],
+  "welcome_event": false
 }
 ```
+
+Optional fields: `timezone` (default UTC), `webhook_url`, `webhook_secret`, `webhook_offsets`, `agentmail_api_key`, `welcome_event` (default true — set to false to skip the auto-created welcome event).
 
 **Response:**
 ```json
@@ -331,7 +374,7 @@ Plain text table of upcoming events. Useful for quick inspection via curl.
 
 **Example:**
 ```
-curl -s http://127.0.0.1:3720/calendars/cal_xxx/view \
+curl -s "http://127.0.0.1:3720/calendars/cal_xxx/view" \
   -H "Authorization: Bearer sk_live_xxx"
 
 Work (cal_xxx)  tz: America/Denver

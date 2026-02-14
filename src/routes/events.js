@@ -116,41 +116,101 @@ async function getCalendar(calendarId) {
 }
 
 /**
- * Fire-and-forget: send outbound invite to attendees and update tracking columns.
- * Does not block the API response. Errors are logged, not thrown.
+ * Send outbound invite to attendees and update tracking columns.
+ * Returns { sent: boolean } so callers can include email_sent in the response.
+ * Errors are caught and logged — never throws.
  */
-function fireInvite(event, calendarId, agentId, agentName) {
+async function fireInvite(event, calendarId, agentId, agentName) {
   const attendees = parseAttendees(event.attendees);
-  if (attendees.length === 0) return;
+  if (attendees.length === 0) return { sent: false };
 
-  console.log('[outbound] Queuing invite: event=%s calendar=%s attendees=%s', event.id, calendarId, attendees.join(','));
+  console.log('[outbound] Sending invite: event=%s calendar=%s attendees=%s', event.id, calendarId, attendees.join(','));
 
-  setImmediate(async () => {
-    try {
-      const calendar = await getCalendar(calendarId);
-      if (!calendar) {
-        console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', calendarId, event.id);
-        return;
-      }
-
-      // Ensure event has an ical_uid
-      let icalUid = event.ical_uid;
-      if (!icalUid) {
-        icalUid = event.id + '@caldave.ai';
-        await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [icalUid, event.id]);
-        event.ical_uid = icalUid;
-      }
-
-      const result = await sendInviteEmail(event, calendar, attendees, { agentId, agentName });
-      if (result.sent) {
-        await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [event.id]);
-      } else {
-        console.log('[outbound] Invite not sent: event=%s reason=%s', event.id, result.reason);
-      }
-    } catch (err) {
-      console.error('[outbound] Invite error: event=%s error=%s', event.id, err.message);
+  try {
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', calendarId, event.id);
+      return { sent: false };
     }
-  });
+
+    // Ensure event has an ical_uid
+    let icalUid = event.ical_uid;
+    if (!icalUid) {
+      icalUid = event.id + '@caldave.ai';
+      await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [icalUid, event.id]);
+      event.ical_uid = icalUid;
+    }
+
+    const result = await sendInviteEmail(event, calendar, attendees, { agentId, agentName });
+    if (result.sent) {
+      await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [event.id]);
+      return { sent: true };
+    } else {
+      console.log('[outbound] Invite not sent: event=%s reason=%s', event.id, result.reason);
+      return { sent: false };
+    }
+  } catch (err) {
+    console.error('[outbound] Invite error: event=%s error=%s', event.id, err.message);
+    return { sent: false };
+  }
+}
+
+/**
+ * Send invite update for a PATCH operation. Handles sequence bump, ical_uid assignment,
+ * and distinguishes between details-changed (send to all) vs attendees-only-changed
+ * (send to new attendees only). Returns { sent: boolean }.
+ */
+async function fireUpdateInvite(updatedEvent, calendarId, oldAttendees, agentId, agentName, { detailsChanged, attendeesChanged, allAttendees } = {}) {
+  try {
+    const calendar = await getCalendar(calendarId);
+    if (!calendar) {
+      console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', calendarId, updatedEvent.id);
+      return { sent: false };
+    }
+    if (!updatedEvent.ical_uid) {
+      const uid = updatedEvent.id + '@caldave.ai';
+      await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [uid, updatedEvent.id]);
+      updatedEvent.ical_uid = uid;
+    }
+
+    const newAttendees = parseAttendees(updatedEvent.attendees);
+
+    // If allAttendees flag set (e.g. rematerialization), always send to all
+    if (allAttendees || detailsChanged) {
+      const seq = (updatedEvent.ical_sequence || 0) + 1;
+      await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedEvent.id]);
+      updatedEvent.ical_sequence = seq;
+      console.log('[outbound] Sending updated invite (seq=%d) to all %d attendees', seq, newAttendees.length);
+      const result = await sendInviteEmail(updatedEvent, calendar, newAttendees, { agentId, agentName });
+      if (result.sent) {
+        await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvent.id]);
+        return { sent: true };
+      } else {
+        console.log('[outbound] Invite not sent: event=%s reason=%s', updatedEvent.id, result.reason);
+        return { sent: false };
+      }
+    } else if (attendeesChanged) {
+      const added = newAttendees.filter((e) => !oldAttendees.includes(e));
+      if (added.length > 0) {
+        console.log('[outbound] Sending invite to %d new attendees: %s', added.length, added.join(','));
+        const result = await sendInviteEmail(updatedEvent, calendar, added, { agentId, agentName });
+        if (result.sent) {
+          await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvent.id]);
+          return { sent: true };
+        } else {
+          console.log('[outbound] Invite not sent: event=%s reason=%s', updatedEvent.id, result.reason);
+          return { sent: false };
+        }
+      } else {
+        console.log('[outbound] No new attendees to invite for event=%s', updatedEvent.id);
+        return { sent: false };
+      }
+    }
+    return { sent: false };
+  } catch (err) {
+    console.error('[outbound] Invite error: event=%s error=%s', updatedEvent.id, err.message);
+    return { sent: false };
+  }
 }
 
 /**
@@ -282,12 +342,16 @@ router.post('/:id/events', async (req, res) => {
       await updateMaterializedUntil(pool, parentEvent.id, horizon);
 
       // Send outbound invite for the series (once, using parent event data)
-      fireInvite(parentEvent, req.params.id, req.agent.id, req.agent.name);
+      const inviteResult = await fireInvite(parentEvent, req.params.id, req.agent.id, req.agent.name);
 
-      return res.status(201).json({
+      const response = {
         ...formatEvent(parentEvent),
         instances_created: instancesCreated,
-      });
+      };
+      if (parseAttendees(parentEvent.attendees).length > 0) {
+        response.email_sent = inviteResult.sent;
+      }
+      return res.status(201).json(response);
     }
 
     // ---- Regular (non-recurring) event ----
@@ -311,9 +375,13 @@ router.post('/:id/events', async (req, res) => {
     );
 
     // Send outbound invite if event has attendees
-    fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
+    const inviteResult = await fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
 
-    res.status(201).json(formatEvent(rows[0]));
+    const response = formatEvent(rows[0]);
+    if (parseAttendees(rows[0].attendees).length > 0) {
+      response.email_sent = inviteResult.sent;
+    }
+    res.status(201).json(response);
   } catch (err) {
     await logError(err, { route: 'POST /calendars/:id/events', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to create event' });
@@ -529,11 +597,15 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       );
 
       // Send outbound invite if attendees changed on this instance
+      const response = formatEvent(rows[0]);
       if (attendees !== undefined) {
-        fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
+        const inviteResult = await fireInvite(rows[0], req.params.id, req.agent.id, req.agent.name);
+        if (parseAttendees(rows[0].attendees).length > 0) {
+          response.email_sent = inviteResult.sent;
+        }
       }
 
-      return res.json(formatEvent(rows[0]));
+      return res.json(response);
     }
 
     // ---- Case B: Patching a recurring parent (has recurrence) ----
@@ -587,39 +659,20 @@ router.patch('/:id/events/:event_id', async (req, res) => {
         const instancesCreated = await rematerialize(pool, updatedParent);
 
         // Send updated invite to all attendees (details changed)
+        let emailSent = false;
         if (parseAttendees(updatedParent.attendees).length > 0) {
-          console.log('[outbound] Queuing updated invite (rematerialized): event=%s', updatedParent.id);
-          setImmediate(async () => {
-            try {
-              const calendar = await getCalendar(req.params.id);
-              if (!calendar) {
-                console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', req.params.id, updatedParent.id);
-                return;
-              }
-              const seq = (updatedParent.ical_sequence || 0) + 1;
-              await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedParent.id]);
-              updatedParent.ical_sequence = seq;
-              if (!updatedParent.ical_uid) {
-                const uid = updatedParent.id + '@caldave.ai';
-                await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [uid, updatedParent.id]);
-                updatedParent.ical_uid = uid;
-              }
-              const result = await sendInviteEmail(updatedParent, calendar, parseAttendees(updatedParent.attendees), { agentId: req.agent.id, agentName: req.agent.name });
-              if (result.sent) {
-                await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
-              } else {
-                console.log('[outbound] Invite not sent: event=%s reason=%s', updatedParent.id, result.reason);
-              }
-            } catch (err) {
-              console.error('[outbound] Invite error: event=%s error=%s', updatedParent.id, err.message);
-            }
-          });
+          const inviteResult = await fireUpdateInvite(updatedParent, req.params.id, [], req.agent.id, req.agent.name, { allAttendees: true });
+          emailSent = inviteResult.sent;
         }
 
-        return res.json({
+        const response = {
           ...formatEvent(updatedParent),
           instances_created: instancesCreated,
-        });
+        };
+        if (parseAttendees(updatedParent.attendees).length > 0) {
+          response.email_sent = emailSent;
+        }
+        return res.json(response);
       } else {
         // Template fields changed — propagate to non-exception instances
         const propagateUpdates = [];
@@ -643,57 +696,13 @@ router.patch('/:id/events/:event_id', async (req, res) => {
         // Send outbound invite if attendees or details changed
         const detailsChanged = title !== undefined || location !== undefined || description !== undefined;
         const attendeesChanged = attendees !== undefined;
+        const patchResponse = formatEvent(updatedParent);
         if ((detailsChanged || attendeesChanged) && parseAttendees(updatedParent.attendees).length > 0) {
-          const oldAttendees = parseAttendees(evt.attendees);
-          const newAttendees = parseAttendees(updatedParent.attendees);
-
-          console.log('[outbound] Queuing invite (template change): event=%s detailsChanged=%s attendeesChanged=%s', updatedParent.id, detailsChanged, attendeesChanged);
-          setImmediate(async () => {
-            try {
-              const calendar = await getCalendar(req.params.id);
-              if (!calendar) {
-                console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', req.params.id, updatedParent.id);
-                return;
-              }
-              if (!updatedParent.ical_uid) {
-                const uid = updatedParent.id + '@caldave.ai';
-                await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [uid, updatedParent.id]);
-                updatedParent.ical_uid = uid;
-              }
-              if (detailsChanged) {
-                // Details changed — send update to ALL attendees
-                const seq = (updatedParent.ical_sequence || 0) + 1;
-                await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedParent.id]);
-                updatedParent.ical_sequence = seq;
-                console.log('[outbound] Sending updated invite (seq=%d) to all %d attendees', seq, newAttendees.length);
-                const result = await sendInviteEmail(updatedParent, calendar, newAttendees, { agentId: req.agent.id, agentName: req.agent.name });
-                if (result.sent) {
-                  await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
-                } else {
-                  console.log('[outbound] Invite not sent: event=%s reason=%s', updatedParent.id, result.reason);
-                }
-              } else if (attendeesChanged) {
-                // Only attendees changed — send to newly-added attendees only
-                const added = newAttendees.filter((e) => !oldAttendees.includes(e));
-                if (added.length > 0) {
-                  console.log('[outbound] Sending invite to %d new attendees: %s', added.length, added.join(','));
-                  const result = await sendInviteEmail(updatedParent, calendar, added, { agentId: req.agent.id, agentName: req.agent.name });
-                  if (result.sent) {
-                    await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedParent.id]);
-                  } else {
-                    console.log('[outbound] Invite not sent: event=%s reason=%s', updatedParent.id, result.reason);
-                  }
-                } else {
-                  console.log('[outbound] No new attendees to invite for event=%s', updatedParent.id);
-                }
-              }
-            } catch (err) {
-              console.error('[outbound] Invite error: event=%s error=%s', updatedParent.id, err.message);
-            }
-          });
+          const inviteResult = await fireUpdateInvite(updatedParent, req.params.id, parseAttendees(evt.attendees), req.agent.id, req.agent.name, { detailsChanged, attendeesChanged });
+          patchResponse.email_sent = inviteResult.sent;
         }
 
-        return res.json(formatEvent(updatedParent));
+        return res.json(patchResponse);
       }
     }
 
@@ -729,57 +738,13 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     // Send outbound invite if attendees or details changed
     const detailsChanged = title !== undefined || start !== undefined || end !== undefined || location !== undefined;
     const attendeesChanged = attendees !== undefined;
+    const standaloneResponse = formatEvent(updatedEvt);
     if ((detailsChanged || attendeesChanged) && parseAttendees(updatedEvt.attendees).length > 0) {
-      const oldAttendees = parseAttendees(evt.attendees);
-      const newAttendees = parseAttendees(updatedEvt.attendees);
-
-      console.log('[outbound] Queuing invite (standalone update): event=%s detailsChanged=%s attendeesChanged=%s', updatedEvt.id, detailsChanged, attendeesChanged);
-      setImmediate(async () => {
-        try {
-          const calendar = await getCalendar(req.params.id);
-          if (!calendar) {
-            console.error('[outbound] Calendar not found: %s (skipping invite for event %s)', req.params.id, updatedEvt.id);
-            return;
-          }
-          if (!updatedEvt.ical_uid) {
-            const uid = updatedEvt.id + '@caldave.ai';
-            await pool.query('UPDATE events SET ical_uid = $1 WHERE id = $2', [uid, updatedEvt.id]);
-            updatedEvt.ical_uid = uid;
-          }
-          if (detailsChanged) {
-            // Details changed — send update to ALL attendees
-            const seq = (updatedEvt.ical_sequence || 0) + 1;
-            await pool.query('UPDATE events SET ical_sequence = $1 WHERE id = $2', [seq, updatedEvt.id]);
-            updatedEvt.ical_sequence = seq;
-            console.log('[outbound] Sending updated invite (seq=%d) to all %d attendees', seq, newAttendees.length);
-            const result = await sendInviteEmail(updatedEvt, calendar, newAttendees, { agentId: req.agent.id, agentName: req.agent.name });
-            if (result.sent) {
-              await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvt.id]);
-            } else {
-              console.log('[outbound] Invite not sent: event=%s reason=%s', updatedEvt.id, result.reason);
-            }
-          } else if (attendeesChanged) {
-            // Only attendees changed — send to newly-added attendees only
-            const added = newAttendees.filter((e) => !oldAttendees.includes(e));
-            if (added.length > 0) {
-              console.log('[outbound] Sending invite to %d new attendees: %s', added.length, added.join(','));
-              const result = await sendInviteEmail(updatedEvt, calendar, added, { agentId: req.agent.id, agentName: req.agent.name });
-              if (result.sent) {
-                await pool.query('UPDATE events SET invite_sent = true WHERE id = $1', [updatedEvt.id]);
-              } else {
-                console.log('[outbound] Invite not sent: event=%s reason=%s', updatedEvt.id, result.reason);
-              }
-            } else {
-              console.log('[outbound] No new attendees to invite for event=%s', updatedEvt.id);
-            }
-          }
-        } catch (err) {
-          console.error('[outbound] Invite error: event=%s error=%s', updatedEvt.id, err.message);
-        }
-      });
+      const inviteResult = await fireUpdateInvite(updatedEvt, req.params.id, parseAttendees(evt.attendees), req.agent.id, req.agent.name, { detailsChanged, attendeesChanged });
+      standaloneResponse.email_sent = inviteResult.sent;
     }
 
-    res.json(formatEvent(updatedEvt));
+    res.json(standaloneResponse);
   } catch (err) {
     await logError(err, { route: 'PATCH /calendars/:id/events/:event_id', method: 'PATCH', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to update event' });

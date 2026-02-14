@@ -152,6 +152,7 @@ async function initSchema() {
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_user text;
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_pass text;
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_from text;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_secure boolean;
   `);
 
   // Backfill inbound_token for existing calendars that don't have one

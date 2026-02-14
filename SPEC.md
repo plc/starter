@@ -11,10 +11,10 @@ docker compose up --build
 DATABASE_URL=postgres://plc:postgres@localhost:5432/caldave PORT=3720 npm run dev
 
 # Test health
-curl http://127.0.0.1:3720/health
+curl "http://127.0.0.1:3720/health"
 
 # Create an agent
-curl -X POST http://127.0.0.1:3720/agents
+curl -X POST "http://127.0.0.1:3720/agents"
 
 # Deploy
 fly deploy
@@ -28,7 +28,7 @@ fly deploy
 | `GET /health` | No | Server health check |
 | `GET /health/db` | No | Database health check |
 | `POST /agents` | No | Create agent (returns API key) |
-| `POST /man` | Optional | Machine-readable API manual (JSON), personalized if authenticated |
+| `GET /man` | Optional | Machine-readable API manual (JSON), personalized if authenticated |
 | `POST /calendars` | Yes | Create calendar |
 | `GET /calendars` | Yes | List agent's calendars |
 | `GET /calendars/:id` | Yes | Get calendar details |
@@ -65,7 +65,7 @@ src/
 │   └── rateLimitStub.js  — Stub rate limit headers
 └── routes/
     ├── agents.js         — POST /agents
-    ├── man.js            — POST /man (machine-readable API manual)
+    ├── man.js            — GET /man (machine-readable API manual)
     ├── calendars.js      — Calendar CRUD
     ├── events.js         — Event CRUD + upcoming + respond
     ├── feeds.js          — iCal feed generation

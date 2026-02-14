@@ -187,7 +187,7 @@ router.patch('/', auth, async (req, res) => {
 // SMTP configuration sub-resource
 // ---------------------------------------------------------------------------
 
-const ALLOWED_SMTP_FIELDS = new Set(['host', 'port', 'username', 'password', 'from']);
+const ALLOWED_SMTP_FIELDS = new Set(['host', 'port', 'username', 'password', 'from', 'secure']);
 
 function formatSmtpResponse(agent) {
   if (!agent.smtp_host) return null;
@@ -196,6 +196,7 @@ function formatSmtpResponse(agent) {
     port: agent.smtp_port,
     username: agent.smtp_user,
     from: agent.smtp_from,
+    secure: agent.smtp_secure !== null ? agent.smtp_secure : (agent.smtp_port === 465),
     configured: true,
   };
 }
@@ -213,7 +214,7 @@ router.put('/smtp', auth, async (req, res) => {
       return res.status(400).json({ error: 'Unknown fields: ' + unknownFields.join(', ') + '. Allowed: host, port, username, password, from' });
     }
 
-    const { host, port, username, password, from } = body;
+    const { host, port, username, password, from, secure } = body;
 
     if (!host || typeof host !== 'string') {
       return res.status(400).json({ error: 'host is required (string)' });
@@ -250,11 +251,18 @@ router.put('/smtp', auth, async (req, res) => {
       return res.status(400).json({ error: 'from must be a valid email address' });
     }
 
+    if (secure !== undefined && typeof secure !== 'boolean') {
+      return res.status(400).json({ error: 'secure must be a boolean' });
+    }
+
+    // Default: port 465 = implicit TLS (secure: true), otherwise STARTTLS (secure: false)
+    const secureValue = secure !== undefined ? secure : null;
+
     const { rows } = await pool.query(
-      `UPDATE agents SET smtp_host = $1, smtp_port = $2, smtp_user = $3, smtp_pass = $4, smtp_from = $5
-       WHERE id = $6
-       RETURNING smtp_host, smtp_port, smtp_user, smtp_from`,
-      [host, port, username, password, from, req.agent.id]
+      `UPDATE agents SET smtp_host = $1, smtp_port = $2, smtp_user = $3, smtp_pass = $4, smtp_from = $5, smtp_secure = $6
+       WHERE id = $7
+       RETURNING smtp_host, smtp_port, smtp_user, smtp_from, smtp_secure`,
+      [host, port, username, password, from, secureValue, req.agent.id]
     );
 
     if (rows.length === 0) {
@@ -275,7 +283,7 @@ router.put('/smtp', auth, async (req, res) => {
 router.get('/smtp', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT smtp_host, smtp_port, smtp_user, smtp_from FROM agents WHERE id = $1',
+      'SELECT smtp_host, smtp_port, smtp_user, smtp_from, smtp_secure FROM agents WHERE id = $1',
       [req.agent.id]
     );
 
@@ -305,7 +313,7 @@ router.get('/smtp', auth, async (req, res) => {
 router.delete('/smtp', auth, async (req, res) => {
   try {
     await pool.query(
-      'UPDATE agents SET smtp_host = NULL, smtp_port = NULL, smtp_user = NULL, smtp_pass = NULL, smtp_from = NULL WHERE id = $1',
+      'UPDATE agents SET smtp_host = NULL, smtp_port = NULL, smtp_user = NULL, smtp_pass = NULL, smtp_from = NULL, smtp_secure = NULL WHERE id = $1',
       [req.agent.id]
     );
 
@@ -316,6 +324,72 @@ router.delete('/smtp', auth, async (req, res) => {
   } catch (err) {
     await logError(err, { route: 'DELETE /agents/smtp', method: 'DELETE', agent_id: req.agent.id });
     res.status(500).json({ error: 'Failed to remove SMTP configuration' });
+  }
+});
+
+/**
+ * POST /agents/smtp/test
+ * Send a test email via the agent's configured SMTP to verify it works.
+ */
+router.post('/smtp/test', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_secure FROM agents WHERE id = $1',
+      [req.agent.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    if (!rows[0].smtp_host) {
+      return res.status(400).json({ error: 'No SMTP configured. Use PUT /agents/smtp to configure your SMTP server first.' });
+    }
+
+    const r = rows[0];
+    const smtpConfig = { host: r.smtp_host, port: r.smtp_port, user: r.smtp_user, pass: r.smtp_pass, from: r.smtp_from, secure: r.smtp_secure };
+
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure !== null && smtpConfig.secure !== undefined ? smtpConfig.secure : (smtpConfig.port === 465),
+      auth: { user: smtpConfig.user, pass: smtpConfig.pass },
+    });
+
+    try {
+      await transporter.verify();
+    } catch (verifyErr) {
+      return res.json({
+        success: false,
+        message: 'SMTP connection failed: ' + verifyErr.message,
+      });
+    }
+
+    // Send a test email to the SMTP from address
+    try {
+      const info = await transporter.sendMail({
+        from: smtpConfig.from,
+        to: smtpConfig.from,
+        subject: 'CalDave SMTP Test',
+        text: 'This is a test email from CalDave to verify your SMTP configuration is working correctly.',
+      });
+
+      res.json({
+        success: true,
+        message_id: info.messageId,
+        from: smtpConfig.from,
+        message: 'Test email sent successfully to ' + smtpConfig.from + '.',
+      });
+    } catch (sendErr) {
+      res.json({
+        success: false,
+        message: 'SMTP send failed: ' + sendErr.message,
+      });
+    }
+  } catch (err) {
+    await logError(err, { route: 'POST /agents/smtp/test', method: 'POST', agent_id: req.agent.id });
+    res.status(500).json({ error: 'Failed to test SMTP' });
   }
 });
 

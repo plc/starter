@@ -199,7 +199,7 @@ describe('Agent metadata', { concurrency: 1 }, () => {
   });
 
   it('POST /man includes agent name in context', async () => {
-    const { status, data } = await api('POST', '/man?guide', { token: state.apiKey });
+    const { status, data } = await api('GET', '/man?guide', { token: state.apiKey });
     assert.equal(status, 200);
     assert.equal(data.your_context.agent_name, 'Final Name');
     assert.equal(data.your_context.agent_description, 'Final desc');
@@ -1405,7 +1405,7 @@ describe('Error log — agent scoping', { concurrency: 1 }, () => {
 
 describe('POST /man', { concurrency: 1 }, () => {
   it('returns full manual without auth', async () => {
-    const { status, data } = await api('POST', '/man');
+    const { status, data } = await api('GET', '/man');
     assert.equal(status, 200);
     assert.ok(data.overview);
     assert.ok(data.base_url);
@@ -1420,7 +1420,7 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('returns personalized context with auth', async () => {
-    const { status, data } = await api('POST', '/man', { token: state.apiKey });
+    const { status, data } = await api('GET', '/man', { token: state.apiKey });
     assert.equal(status, 200);
     assert.equal(data.your_context.authenticated, true);
     assert.equal(data.your_context.agent_id, state.agentId);
@@ -1428,7 +1428,7 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('uses real calendar IDs in curl examples when authenticated', async () => {
-    const { data } = await api('POST', '/man', { token: state.apiKey });
+    const { data } = await api('GET', '/man', { token: state.apiKey });
 
     // Agent should have at least one calendar from earlier tests
     assert.ok(data.your_context.calendars.length > 0, 'Should have calendars in context');
@@ -1448,13 +1448,13 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('invalid token falls back to unauthenticated', async () => {
-    const { status, data } = await api('POST', '/man', { token: 'sk_live_invalid_key_xyz' });
+    const { status, data } = await api('GET', '/man', { token: 'sk_live_invalid_key_xyz' });
     assert.equal(status, 200);
     assert.equal(data.your_context.authenticated, false);
   });
 
   it('?guide returns compact response without endpoints', async () => {
-    const { status, data } = await api('POST', '/man?guide');
+    const { status, data } = await api('GET', '/man?guide');
     assert.equal(status, 200);
     assert.ok(data.overview);
     assert.ok(data.base_url);
@@ -1464,7 +1464,7 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('?guide with auth returns personalized context', async () => {
-    const { status, data } = await api('POST', '/man?guide', { token: state.apiKey });
+    const { status, data } = await api('GET', '/man?guide', { token: state.apiKey });
     assert.equal(status, 200);
     assert.equal(data.your_context.authenticated, true);
     assert.equal(data.your_context.agent_id, state.agentId);
@@ -1472,7 +1472,7 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('every endpoint entry has required fields', async () => {
-    const { data } = await api('POST', '/man');
+    const { data } = await api('GET', '/man');
     for (const ep of data.endpoints) {
       assert.ok(ep.method, `Endpoint missing method: ${JSON.stringify(ep)}`);
       assert.ok(ep.path, `Endpoint missing path: ${JSON.stringify(ep)}`);
@@ -1486,7 +1486,7 @@ describe('POST /man', { concurrency: 1 }, () => {
   it('recommendation changes based on agent state', async () => {
     // Create a fresh agent with no calendars
     const { data: fresh } = await api('POST', '/agents');
-    const { data: noCalData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    const { data: noCalData } = await api('GET', '/man?guide', { token: fresh.api_key });
     assert.equal(noCalData.recommended_next_step.endpoint, 'POST /calendars');
 
     // Give it a calendar
@@ -1495,7 +1495,7 @@ describe('POST /man', { concurrency: 1 }, () => {
       body: { name: 'Rec Test' },
     });
     // Calendar now has a welcome event auto-created, so recommendation skips to upcoming
-    const { data: noEvtData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    const { data: noEvtData } = await api('GET', '/man?guide', { token: fresh.api_key });
     assert.equal(noEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
 
     // Give it an event
@@ -1503,7 +1503,7 @@ describe('POST /man', { concurrency: 1 }, () => {
       token: fresh.api_key,
       body: { title: 'Test', start: futureDate(1), end: futureDate(2) },
     });
-    const { data: hasEvtData } = await api('POST', '/man?guide', { token: fresh.api_key });
+    const { data: hasEvtData } = await api('GET', '/man?guide', { token: fresh.api_key });
     assert.equal(hasEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
 
     // Clean up

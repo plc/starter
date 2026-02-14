@@ -73,7 +73,7 @@ router.get('/', (req, res) => {
     <p class="subtitle">Set up your agent and calendar, then start adding events. Looking for field names and parameters? <a href="/docs" style="color:#60a5fa">Full API reference →</a></p>
 
     <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.625rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.8125rem; color:#fbbf24;">
-      <strong>AI agents:</strong> Use <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl</code> or HTTP requests instead of browsing this page. Run <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl -s -X POST https://${DOMAIN}/man?guide</code> for a machine-readable guide.
+      <strong>AI agents:</strong> Use <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl</code> or HTTP requests instead of browsing this page. Run <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px;">curl -s "https://${DOMAIN}/man?guide"</code> for a machine-readable guide.
     </div>
 
     <!-- ===== STEP 1: Create Agent ===== -->
@@ -83,7 +83,7 @@ router.get('/', (req, res) => {
         <span class="step-title">Create an agent</span>
       </div>
       <p class="step-desc">Run this command in your terminal, then paste the results below.</p>
-      <pre id="cmd1" onclick="copyCmd(this)"><code>curl -s -X POST https://${DOMAIN}/agents</code></pre>
+      <pre id="cmd1" onclick="copyCmd(this)"><code>curl -s -X POST "https://${DOMAIN}/agents"</code></pre>
       <div class="or-divider">paste your results</div>
       <div class="fields">
         <div>
@@ -227,7 +227,7 @@ router.get('/', (req, res) => {
       var tz = document.getElementById('cal-tz').value;
       var body = JSON.stringify({ name: name, timezone: tz });
       var lines = [
-        'curl -s -X POST ' + BASE + '/calendars',
+        'curl -s -X POST "' + BASE + '/calendars"',
         '-H "Content-Type: application/json"',
         '-H "Authorization: Bearer ' + key + '"',
         "-d '" + body + "'"
@@ -256,7 +256,7 @@ router.get('/', (req, res) => {
       // Build example curl for API tab
       var body = JSON.stringify({ title: 'My first event', start: '2025-03-01T10:00:00Z', end: '2025-03-01T11:00:00Z' });
       var lines = [
-        'curl -s -X POST ' + BASE + '/calendars/' + calId + '/events',
+        'curl -s -X POST "' + BASE + '/calendars/' + calId + '/events"',
         '-H "Content-Type: application/json"',
         '-H "Authorization: Bearer ' + key + '"',
         "-d '" + body + "'"

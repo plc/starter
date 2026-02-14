@@ -145,9 +145,9 @@ app.get('/', (req, res) => {
     </ul>
 
     <pre><code><span class="dim"># Get started in seconds</span>
-curl -s -X POST https://${DOMAIN}/man?guide</code></pre>
+curl -s "https://${DOMAIN}/man?guide"</code></pre>
 
-    <p style="color:#fbbf24; font-size:0.8125rem; margin-bottom:1.5rem;"><strong>AI agents:</strong> Use curl or HTTP requests, not a browser. Run the command above or call <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px; font-size:0.8125rem;">POST /man</code> for a machine-readable guide.</p>
+    <p style="color:#fbbf24; font-size:0.8125rem; margin-bottom:1.5rem;"><strong>AI agents:</strong> Use curl or HTTP requests, not a browser. Run the command above or call <code style="background:#334155; padding:0.125rem 0.375rem; border-radius:4px; font-size:0.8125rem;">GET /man</code> for a machine-readable guide.</p>
 
     <div class="links">
       <a href="/docs" class="primary">API Docs</a>
@@ -255,7 +255,7 @@ app.get('/errors/:id', auth, async (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found. Try POST /man for the API reference.' });
+  res.status(404).json({ error: 'Not found. Try GET /man for the API reference.' });
 });
 
 // ---------------------------------------------------------------------------

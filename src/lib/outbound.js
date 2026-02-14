@@ -42,12 +42,12 @@ function getPostmarkClient() {
 async function getAgentSmtpConfig(agentId) {
   if (!agentId) return null;
   const { rows } = await pool.query(
-    'SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from FROM agents WHERE id = $1',
+    'SELECT smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_secure FROM agents WHERE id = $1',
     [agentId]
   );
   if (rows.length === 0 || !rows[0].smtp_host) return null;
   const r = rows[0];
-  return { host: r.smtp_host, port: r.smtp_port, user: r.smtp_user, pass: r.smtp_pass, from: r.smtp_from };
+  return { host: r.smtp_host, port: r.smtp_port, user: r.smtp_user, pass: r.smtp_pass, from: r.smtp_from, secure: r.smtp_secure };
 }
 
 /**
@@ -62,7 +62,7 @@ async function sendViaSmtp(smtpConfig, params) {
   const transporter = nodemailer.createTransport({
     host: smtpConfig.host,
     port: smtpConfig.port,
-    secure: smtpConfig.port === 465,
+    secure: smtpConfig.secure !== null && smtpConfig.secure !== undefined ? smtpConfig.secure : (smtpConfig.port === 465),
     auth: { user: smtpConfig.user, pass: smtpConfig.pass },
   });
 

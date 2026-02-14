@@ -73,11 +73,11 @@ router.get('/', (req, res) => {
     <p class="subtitle">Calendar-as-a-service for AI agents. Base URL: <code class="inline-code">https://${DOMAIN}</code></p>
 
     <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.75rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.875rem; color:#fbbf24;">
-      <strong>AI agents:</strong> This is a REST API. Use <code class="inline-code">curl</code> or HTTP requests from your code — not a browser. Start with <code class="inline-code">POST https://${DOMAIN}/man</code> for a machine-readable guide.
+      <strong>AI agents:</strong> This is a REST API. Use <code class="inline-code">curl</code> or HTTP requests from your code — not a browser. Start with <code class="inline-code">GET https://${DOMAIN}/man</code> for a machine-readable guide.
     </div>
 
     <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.75rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.875rem; color:#fbbf24;">
-      <strong>AI agents:</strong> CalDave is actively evolving. Poll <code class="inline-code">GET /changelog</code> weekly to discover new endpoints and capabilities. Pass your Bearer token to <code class="inline-code">/changelog</code> and <code class="inline-code">POST /man</code> for personalized results — see what changed since you signed up and get recommendations for your next steps.
+      <strong>AI agents:</strong> CalDave is actively evolving. Poll <code class="inline-code">GET /changelog</code> weekly to discover new endpoints and capabilities. Pass your Bearer token to <code class="inline-code">/changelog</code> and <code class="inline-code">GET /man</code> for personalized results — see what changed since you signed up and get recommendations for your next steps.
     </div>
 
     <div class="toc">
@@ -90,6 +90,7 @@ router.get('/', (req, res) => {
         <li><a href="#put-smtp">PUT /agents/smtp</a> — Configure SMTP</li>
         <li><a href="#get-smtp">GET /agents/smtp</a> — View SMTP config</li>
         <li><a href="#delete-smtp">DELETE /agents/smtp</a> — Remove SMTP config</li>
+        <li><a href="#post-smtp-test">POST /agents/smtp/test</a> — Test SMTP config</li>
       </ul>
       <div class="section">Calendars</div>
       <ul>
@@ -124,7 +125,7 @@ router.get('/', (req, res) => {
       <div class="section">Discovery</div>
       <ul>
         <li><a href="#get-changelog">GET /changelog</a> — API changelog</li>
-        <li><a href="#post-man">POST /man</a> — Machine-readable API manual</li>
+        <li><a href="#get-man">GET /man</a> — Machine-readable API manual</li>
       </ul>
     </div>
 
@@ -156,10 +157,10 @@ router.get('/', (req, res) => {
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">name <span class="param-rec">recommended</span></span><span class="param-desc">Display name for the agent (max 255 chars). Appears in outbound email From headers (e.g. "My Agent" &lt;cal-xxx@${EMAIL_DOMAIN}&gt;).</span></div>
-        <div class="param"><span class="param-name">description <span class="param-rec">recommended</span></span><span class="param-desc">What the agent does (max 1024 chars). Surfaced in POST /man personalized context.</span></div>
+        <div class="param"><span class="param-name">description <span class="param-rec">recommended</span></span><span class="param-desc">What the agent does (max 1024 chars). Surfaced in GET /man personalized context.</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/agents" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "Meeting Scheduler", "description": "Books rooms and sends reminders"}'</code></pre>
       <div class="label">Response</div>
@@ -180,7 +181,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Get the authenticated agent's profile.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/agents/me \\
+      <pre><code>curl -s "https://${DOMAIN}/agents/me" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Response</div>
       <pre><code>{
@@ -204,7 +205,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">description</span><span class="param-desc">What the agent does (max 1024 chars)</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PATCH https://${DOMAIN}/agents \\
+      <pre><code>curl -s -X PATCH "https://${DOMAIN}/agents" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"name": "Updated Name"}'</code></pre>
@@ -232,9 +233,10 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">username <span class="param-req">required</span></span><span class="param-desc">SMTP auth username</span></div>
         <div class="param"><span class="param-name">password <span class="param-req">required</span></span><span class="param-desc">SMTP auth password (stored securely, never returned in responses)</span></div>
         <div class="param"><span class="param-name">from <span class="param-req">required</span></span><span class="param-desc">From email address for outbound emails</span></div>
+        <div class="param"><span class="param-name">secure <span class="param-opt">optional</span></span><span class="param-desc">Use implicit TLS (<code class="inline-code">true</code>) or STARTTLS (<code class="inline-code">false</code>). Defaults to true for port 465, false otherwise.</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PUT https://${DOMAIN}/agents/smtp \\
+      <pre><code>curl -s -X PUT "https://${DOMAIN}/agents/smtp" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"host": "smtp.agentmail.to", "port": 465, "username": "inbox@agentmail.to", "password": "YOUR_SMTP_PASSWORD", "from": "inbox@agentmail.to"}'</code></pre>
@@ -245,6 +247,7 @@ router.get('/', (req, res) => {
     "port": 465,
     "username": "inbox@agentmail.to",
     "from": "inbox@agentmail.to",
+    "secure": true,
     "configured": true
   }
 }</code></pre>
@@ -259,7 +262,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">View the current SMTP configuration (password excluded).</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/agents/smtp \\
+      <pre><code>curl -s "https://${DOMAIN}/agents/smtp" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -271,8 +274,27 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Remove the SMTP configuration. Outbound emails revert to CalDave's built-in delivery.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s -X DELETE https://${DOMAIN}/agents/smtp \\
+      <pre><code>curl -s -X DELETE "https://${DOMAIN}/agents/smtp" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+    </div>
+
+    <div class="endpoint" id="post-smtp-test">
+      <div class="method-path">
+        <span class="method post">POST</span>
+        <span class="path">/agents/smtp/test</span>
+        <span class="auth-badge required">Bearer token</span>
+      </div>
+      <p class="desc">Send a test email to verify your SMTP configuration works. Sends to the configured <code class="inline-code">from</code> address and reports the result.</p>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X POST "https://${DOMAIN}/agents/smtp/test" \\
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+      <div class="label">Response</div>
+      <pre><code>{
+  "success": true,
+  "message_id": "&lt;abc123@smtp.agentmail.to&gt;",
+  "from": "inbox@agentmail.to",
+  "message": "Test email sent successfully to inbox@agentmail.to."
+}</code></pre>
     </div>
 
     <!-- ============================================================ -->
@@ -290,10 +312,13 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">name <span class="param-req">required</span></span><span class="param-desc">Calendar display name</span></div>
         <div class="param"><span class="param-name">timezone <span class="param-opt">optional</span></span><span class="param-desc">IANA timezone (default: UTC)</span></div>
         <div class="param"><span class="param-name">agentmail_api_key <span class="param-opt">optional</span></span><span class="param-desc">AgentMail API key for fetching inbound email attachments</span></div>
-        <div class="param"><span class="param-name">welcome_event <span class="param-opt">optional</span></span><span class="param-desc">Set to <code class="inline-code">false</code> to skip the auto-created welcome event. Defaults to true.</span></div>
+        <div class="param"><span class="param-name">webhook_url <span class="param-opt">optional</span></span><span class="param-desc">URL to receive event webhooks (must be a valid URL)</span></div>
+        <div class="param"><span class="param-name">webhook_secret <span class="param-opt">optional</span></span><span class="param-desc">Secret for HMAC-SHA256 webhook signatures (sent in <code class="inline-code">X-CalDave-Signature</code> header)</span></div>
+        <div class="param"><span class="param-name">webhook_offsets <span class="param-opt">optional</span></span><span class="param-desc">Array of offsets in seconds for pre-event webhook reminders (e.g. <code class="inline-code">[300, 900]</code> for 5min and 15min before)</span></div>
+        <div class="param"><span class="param-name">welcome_event <span class="param-opt">optional</span></span><span class="param-desc">Set to <code class="inline-code">false</code> to skip the auto-created welcome event (recommended for production agents). Defaults to true.</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"name": "Work Schedule", "timezone": "America/Denver"}'</code></pre>
@@ -318,7 +343,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">List all calendars for the authenticated agent.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars \\
+      <pre><code>curl -s "https://${DOMAIN}/calendars" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -330,7 +355,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Get a single calendar by ID.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID \\
+      <pre><code>curl -s "https://${DOMAIN}/calendars/CAL_ID" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -351,7 +376,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">agentmail_api_key</span><span class="param-desc">AgentMail API key for this calendar</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID \\
+      <pre><code>curl -s -X PATCH "https://${DOMAIN}/calendars/CAL_ID" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"name": "Updated Name", "timezone": "America/New_York"}'</code></pre>
@@ -365,7 +390,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Delete a calendar and all its events. Returns 204 on success.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s -X DELETE https://${DOMAIN}/calendars/CAL_ID \\
+      <pre><code>curl -s -X DELETE "https://${DOMAIN}/calendars/CAL_ID" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -377,7 +402,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Send a test payload to the calendar's configured webhook URL. Returns the HTTP status code from the webhook endpoint. Useful for verifying webhook configuration before real events fire.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/webhook/test \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/webhook/test" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Response</div>
       <pre><code>{
@@ -413,7 +438,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">recurrence <span class="param-opt">optional</span></span><span class="param-desc">RFC 5545 RRULE string (e.g. FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR). Alias: <code class="inline-code">rrule</code></span></div>
       </div>
       <div class="label">Example — one-off event</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/events" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
@@ -423,7 +448,7 @@ router.get('/', (req, res) => {
     "location": "https://meet.google.com/abc-defg-hij"
   }'</code></pre>
       <div class="label">Example — recurring event</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/events" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
@@ -434,7 +459,7 @@ router.get('/', (req, res) => {
     "recurrence": "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR"
   }'</code></pre>
       <div class="label">Example — all-day event</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/events" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
@@ -475,7 +500,7 @@ router.get('/', (req, res) => {
       </div>
       <p class="desc">Get a single event by ID.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID \\
+      <pre><code>curl -s "https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -500,7 +525,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">recurrence</span><span class="param-desc">Updated RRULE (parent only — triggers rematerialization). Alias: <code class="inline-code">rrule</code></span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X PATCH https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID \\
+      <pre><code>curl -s -X PATCH "https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"title": "Updated title", "location": "Room 42"}'</code></pre>
@@ -534,7 +559,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">limit</span><span class="param-desc">Number of events to return (default 5, max 50)</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/upcoming \\
+      <pre><code>curl -s "https://${DOMAIN}/calendars/CAL_ID/upcoming" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Response</div>
       <pre><code>{
@@ -556,7 +581,7 @@ router.get('/', (req, res) => {
         <div class="param"><span class="param-name">limit</span><span class="param-desc">Number of events to show (default 10, max 50)</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/calendars/CAL_ID/view \\
+      <pre><code>curl -s "https://${DOMAIN}/calendars/CAL_ID/view" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Response (text/plain)</div>
       <pre><code>Work (cal_xxx)  tz: America/Denver
@@ -580,7 +605,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <div class="param"><span class="param-name">response <span class="param-req">required</span></span><span class="param-desc">accepted, declined, or tentative</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID/respond \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/events/EVT_ID/respond" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"response": "accepted"}'</code></pre>
@@ -643,7 +668,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <div class="param"><span class="param-name">route</span><span class="param-desc">Filter by route pattern</span></div>
       </div>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/errors \\
+      <pre><code>curl -s "https://${DOMAIN}/errors" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -655,7 +680,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
       </div>
       <p class="desc">Get a single error with full stack trace.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/errors/42 \\
+      <pre><code>curl -s "https://${DOMAIN}/errors/42" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
     </div>
 
@@ -670,7 +695,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
       </div>
       <p class="desc">Structured list of API changes with dates and docs links. With a Bearer token, highlights changes since your agent was created and includes personalized recommendations. Poll ~weekly to discover new features.</p>
       <div class="label">Example</div>
-      <pre><code>curl -s https://${DOMAIN}/changelog \\
+      <pre><code>curl -s "https://${DOMAIN}/changelog" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Response (authenticated)</div>
       <pre><code>{
@@ -686,18 +711,18 @@ Daily standup  2026-02-13 16:00:00Z  ...
       <div class="note">The <code class="inline-code">recommendations</code> array includes actionable suggestions based on your agent state (e.g. name your agent, create a calendar, create an event). Only present when authenticated and there are suggestions.</div>
     </div>
 
-    <div class="endpoint" id="post-man">
+    <div class="endpoint" id="get-man">
       <div class="method-path">
-        <span class="method post">POST</span>
+        <span class="method get">GET</span>
         <span class="path">/man</span>
         <span class="auth-badge">No auth (optional Bearer)</span>
       </div>
       <p class="desc">Machine-readable API manual. Returns all endpoints with curl examples and parameters. With Bearer auth, includes your real calendar IDs and a recommended next step. Use <code class="inline-code">?guide</code> for a compact onboarding overview.</p>
       <div class="label">Example — full reference</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/man \\
+      <pre><code>curl -s "https://${DOMAIN}/man" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="label">Example — guided onboarding</div>
-      <pre><code>curl -s -X POST "https://${DOMAIN}/man?guide" \\
+      <pre><code>curl -s "https://${DOMAIN}/man?guide" \\
   -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
       <div class="note">The <code class="inline-code">?guide</code> mode returns only an overview, your context, a recommended next step, and links to discover more. Ideal for first-time agent onboarding.</div>
     </div>
@@ -707,20 +732,20 @@ Daily standup  2026-02-13 16:00:00Z  ...
     <div class="endpoint">
       <p class="desc">Get up and running in three steps:</p>
       <div class="label">1. Create an agent</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/agents \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/agents" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "My Agent", "description": "What this agent does"}'</code></pre>
       <p class="response-note">Save the agent_id and api_key from the response. The name appears in outbound emails.</p>
 
       <div class="label" style="margin-top: 1rem;">2. Create a calendar</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{"name": "My Calendar", "timezone": "America/Denver"}'</code></pre>
       <p class="response-note">Save the calendar_id, email, and feed URLs from the response.</p>
 
       <div class="label" style="margin-top: 1rem;">3. Create an event</div>
-      <pre><code>curl -s -X POST https://${DOMAIN}/calendars/CAL_ID/events \\
+      <pre><code>curl -s -X POST "https://${DOMAIN}/calendars/CAL_ID/events" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
