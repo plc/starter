@@ -58,4 +58,44 @@ This file documents confusing issues, mistakes, and lessons learned. When Claude
 
 **Prevention**: Always pass `{ name: ..., email: ... }` to `ical-generator`'s organizer option.
 
+### Security probe: Feb 14, 2026
+
+**Date**: 2026-02-14
+
+**Problem**: Systematic security probe tested multiple attack vectors against the production API at ~20:45-20:49 UTC.
+
+**Attack vectors tested and results**:
+
+| # | Vector | Payload | Result | Severity |
+|---|--------|---------|--------|----------|
+| 1 | SQL injection | `Meeting"); DROP TABLE events;--` as event title | ✅ Blocked — parameterized queries treat it as literal string | None |
+| 2 | XSS | `<img src=x onerror=alert(1)>Meeting` as event title | ⚠️ Stored as-is — safe because CalDave is API-only (no HTML rendering), but downstream consumers could be vulnerable | Low |
+| 3 | Malformed JSON | Various broken JSON bodies | ⚠️ Express returned 500 instead of 400 — should validate before hitting DB | Low |
+| 4 | Invalid timezone | `Mars/Olympus_Mons` | ⚠️ Postgres rejected (500) — should validate and return 400 | Low |
+| 5 | Extreme date | `-001000-01-01T00:00:00Z` (year -1000) | ⚠️ Postgres rejected (500) — should validate range | Low |
+| 6 | Negative OFFSET | Negative pagination offset | ⚠️ Postgres rejected (500) — should clamp to 0 | Low |
+| 7 | Invalid emails | `not-an-email`, `<script>`, `foo@bar@baz` as attendees | ✅ Postmark rejected at send time | Low |
+| 8 | Mass recipients | 99 fake email addresses as attendees | ✅ Postmark's 50-recipient limit blocked the send | Low |
+| 9 | Duplicate attendees | Same email repeated 3x + uppercase variant | ⚠️ Went through — no deduplication on attendees array | Medium |
+| 10 | Null byte injection | `\x00` in event fields | ✅ Postgres rejected invalid UTF-8 byte sequence | Low |
+| 11 | Zalgo text | Combining characters in event title | ✅ Valid UTF-8, stored correctly — cosmetic issue only | None |
+| 12 | Email spam | Created ~15 events with attendees, triggering real invite emails | ⚠️ No per-agent rate limit on outbound emails | Medium |
+| 13 | Inbound email hijack | Sent calendar invites via email, modified title to "I HIJACKED YOUR EVENT TITLE" | ✅ Working as designed — they had API key access to their own calendar | None |
+
+**Cause**: The tester had a valid API key and systematically probed input validation boundaries, email delivery, and injection resistance.
+
+**Damage**: None. No data was lost, no code was executed, no unauthorized access occurred. The SQL injection and null byte attempts were fully blocked by parameterized queries and Postgres encoding validation. Some garbage events were created on their own calendar, and ~15 invite emails were sent (all to addresses the attacker specified).
+
+**Hardening items identified** (in priority order):
+
+1. **Attendee deduplication** — Deduplicate the attendees array (case-insensitive) before storing and sending invites
+2. **Attendee limit** — Cap attendees per event (e.g., 50) to prevent mass email abuse
+3. **Outbound email rate limit** — Rate limit invite sends per agent per hour to prevent email spam
+4. **Validate pagination offset** — Clamp `offset` to >= 0 instead of letting Postgres reject it
+5. **Validate timezone before INSERT** — Check against `Intl.supportedValuesOf('timeZone')` and return 400
+6. **Validate date ranges** — Reject dates outside a reasonable range (e.g., year 1900-2200)
+7. **Consider HTML sanitization** — Strip HTML tags from event titles/descriptions to prevent stored XSS for downstream consumers
+
+**Prevention**: Add input validation at the application layer instead of relying on Postgres to reject bad data. Postgres rejections cause 500s that pollute error logs and look like bugs.
+
 <!-- Add new post-mortems above this line -->

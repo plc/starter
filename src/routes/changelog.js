@@ -122,6 +122,34 @@ const CHANGELOG = [
     version: null,
     changes: [
       {
+        type: 'fix',
+        title: 'Attendee input validation',
+        description: 'attendees must be an array of valid email strings. Non-array values, non-string elements, and invalid emails are rejected with 400. Attendees are deduplicated case-insensitively and capped at 50 per event. Previously, invalid values could be stored and crash the iCal feed.',
+        endpoints: ['POST /calendars/:id/events', 'PATCH /calendars/:id/events/:event_id'],
+        docs: BASE + '/docs#events',
+      },
+      {
+        type: 'fix',
+        title: 'End-before-start validation for timed events',
+        description: 'Timed events where end is before start are now rejected with 400. All-day events already had this check.',
+        endpoints: ['POST /calendars/:id/events', 'PATCH /calendars/:id/events/:event_id'],
+        docs: BASE + '/docs#events',
+      },
+      {
+        type: 'fix',
+        title: 'Dangerous URI schemes rejected in location',
+        description: 'javascript:, data:, vbscript:, and file: URIs are now rejected in event location fields to prevent stored XSS in calendar invite emails.',
+        endpoints: ['POST /calendars/:id/events', 'PATCH /calendars/:id/events/:event_id'],
+        docs: BASE + '/docs#events',
+      },
+      {
+        type: 'fix',
+        title: 'Defensive iCal feed generation',
+        description: 'The iCal feed generator now gracefully handles malformed attendee data in the database instead of crashing the entire feed.',
+        endpoints: ['GET /feeds/:calendar_id.ics'],
+        docs: BASE + '/docs#feeds',
+      },
+      {
         type: 'feature',
         title: 'Scoped /man with ?topic= filter',
         description: 'GET /man now supports ?topic= to filter endpoints by category (agents, smtp, calendars, events, feeds, errors). Comma-separated for multiple topics. Discovery endpoints (/man, /changelog) are always included. Reduces token usage for agents with limited context windows.',

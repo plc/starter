@@ -1208,6 +1208,164 @@ describe('Input validation', { concurrency: 1 }, () => {
     await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
   });
 
+  // --- Attendee validation ---
+
+  it('rejects non-array attendees', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad', start: futureDate(1), end: futureDate(2), attendees: 'not-an-array' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('array'), data.error);
+  });
+
+  it('rejects non-string attendee element', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad', start: futureDate(1), end: futureDate(2), attendees: [123] },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('string'), data.error);
+  });
+
+  it('rejects invalid email in attendees', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad', start: futureDate(1), end: futureDate(2), attendees: ['not-an-email'] },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('invalid email'), data.error);
+  });
+
+  it('rejects script tag as attendee email', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Bad', start: futureDate(1), end: futureDate(2), attendees: ['<script>'] },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('invalid email'), data.error);
+  });
+
+  it('rejects more than 50 attendees', async () => {
+    const emails = Array.from({ length: 51 }, (_, i) => `user${i}@example.com`);
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Big', start: futureDate(1), end: futureDate(2), attendees: emails },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('50'), data.error);
+  });
+
+  it('deduplicates attendees case-insensitively', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: {
+        title: 'Dedup test',
+        start: futureDate(1),
+        end: futureDate(2),
+        attendees: ['A@EXAMPLE.COM', 'a@example.com', 'B@EXAMPLE.COM'],
+      },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.attendees.length, 2);
+    assert.ok(data.attendees.includes('a@example.com'));
+    assert.ok(data.attendees.includes('b@example.com'));
+
+    await api('DELETE', `/calendars/${valCalId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('rejects non-array attendees on PATCH', async () => {
+    const { data: created } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Temp', start: futureDate(1), end: futureDate(2) },
+    });
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}/events/${created.id}`, {
+      token: state.apiKey,
+      body: { attendees: 'not-an-array' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('array'), data.error);
+    await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
+  // --- End >= Start validation ---
+
+  it('rejects end before start on POST', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Backwards', start: futureDate(48), end: futureDate(1) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('end must be after start'), data.error);
+  });
+
+  it('rejects end before start on PATCH', async () => {
+    const { data: created } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Temp', start: futureDate(1), end: futureDate(2) },
+    });
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}/events/${created.id}`, {
+      token: state.apiKey,
+      body: { start: futureDate(48) },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('end must be after start'), data.error);
+    await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
+  // --- Location URI scheme validation ---
+
+  it('rejects javascript: URI in location', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'XSS', start: futureDate(1), end: futureDate(2), location: 'javascript:alert(1)' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('disallowed URI scheme'), data.error);
+  });
+
+  it('rejects data: URI in location', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'XSS', start: futureDate(1), end: futureDate(2), location: 'data:text/html,<script>alert(1)</script>' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('disallowed URI scheme'), data.error);
+  });
+
+  it('accepts normal location strings', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Normal', start: futureDate(1), end: futureDate(2), location: 'Conference Room A' },
+    });
+    assert.equal(status, 201);
+    assert.equal(data.location, 'Conference Room A');
+    await api('DELETE', `/calendars/${valCalId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('accepts https URL in location', async () => {
+    const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Normal', start: futureDate(1), end: futureDate(2), location: 'https://zoom.us/j/123' },
+    });
+    assert.equal(status, 201);
+    await api('DELETE', `/calendars/${valCalId}/events/${data.id}`, { token: state.apiKey });
+  });
+
+  it('rejects javascript: URI in location on PATCH', async () => {
+    const { data: created } = await api('POST', `/calendars/${valCalId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Temp', start: futureDate(1), end: futureDate(2) },
+    });
+    const { status, data } = await api('PATCH', `/calendars/${valCalId}/events/${created.id}`, {
+      token: state.apiKey,
+      body: { location: 'javascript:void(0)' },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('disallowed URI scheme'), data.error);
+    await api('DELETE', `/calendars/${valCalId}/events/${created.id}`, { token: state.apiKey });
+  });
+
   it('rejects FREQ=MINUTELY', async () => {
     const { status, data } = await api('POST', `/calendars/${valCalId}/events`, {
       token: state.apiKey,

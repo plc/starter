@@ -233,11 +233,37 @@ function normalizeBody(body) {
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DANGEROUS_SCHEME_RE = /^(javascript|data|vbscript|file):/i;
 
 function isValidDatetime(str) {
   if (typeof str !== 'string') return false;
   const d = new Date(str);
   return !isNaN(d.getTime());
+}
+
+/**
+ * Validate and clean an attendees array.
+ * Returns { error } if invalid, or { cleaned } with deduplicated lowercase emails.
+ */
+function validateAttendees(attendees) {
+  if (!Array.isArray(attendees)) {
+    return { error: 'attendees must be an array' };
+  }
+  for (const entry of attendees) {
+    if (typeof entry !== 'string') {
+      return { error: 'each attendee must be a string' };
+    }
+    if (!EMAIL_RE.test(entry)) {
+      return { error: `invalid email in attendees: ${entry}` };
+    }
+  }
+  // Deduplicate (case-insensitive)
+  const cleaned = [...new Set(attendees.map(e => e.toLowerCase()))];
+  if (cleaned.length > 50) {
+    return { error: 'maximum 50 attendees per event' };
+  }
+  return { cleaned };
 }
 
 /**
@@ -282,6 +308,17 @@ router.post('/:id/events', async (req, res) => {
     // Length checks
     if (title.length > 500) return res.status(400).json({ error: 'title exceeds 500 character limit' });
     if (location && location.length > 500) return res.status(400).json({ error: 'location exceeds 500 character limit' });
+    if (location && DANGEROUS_SCHEME_RE.test(location.trim())) {
+      return res.status(400).json({ error: 'location contains a disallowed URI scheme' });
+    }
+
+    // Attendee validation
+    let cleanedAttendees = attendees;
+    if (attendees !== undefined && attendees !== null) {
+      const result = validateAttendees(attendees);
+      if (result.error) return res.status(400).json({ error: result.error });
+      cleanedAttendees = result.cleaned;
+    }
 
     // Size checks
     if (description && Buffer.byteLength(description) > MAX_DESCRIPTION) {
@@ -312,6 +349,9 @@ router.post('/:id/events', async (req, res) => {
       if (!isValidDatetime(end)) {
         return res.status(400).json({ error: 'end must be a valid ISO 8601 datetime' });
       }
+      if (new Date(start) > new Date(end)) {
+        return res.status(400).json({ error: 'end must be after start' });
+      }
     }
 
     const id = eventId();
@@ -339,7 +379,7 @@ router.post('/:id/events', async (req, res) => {
           endTime,
           location || null,
           recurrence,
-          attendees ? JSON.stringify(attendees) : null,
+          cleanedAttendees ? JSON.stringify(cleanedAttendees) : null,
           !!all_day,
         ]
       );
@@ -382,7 +422,7 @@ router.post('/:id/events', async (req, res) => {
         endTime,
         location || null,
         status || 'confirmed',
-        attendees ? JSON.stringify(attendees) : null,
+        cleanedAttendees ? JSON.stringify(cleanedAttendees) : null,
         !!all_day,
       ]
     );
@@ -546,6 +586,17 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     if (location !== undefined && location.length > 500) {
       return res.status(400).json({ error: 'location exceeds 500 character limit' });
     }
+    if (location !== undefined && DANGEROUS_SCHEME_RE.test(location.trim())) {
+      return res.status(400).json({ error: 'location contains a disallowed URI scheme' });
+    }
+
+    // Attendee validation
+    let cleanedAttendees = attendees;
+    if (attendees !== undefined && attendees !== null) {
+      const result = validateAttendees(attendees);
+      if (result.error) return res.status(400).json({ error: result.error });
+      cleanedAttendees = result.cleaned;
+    }
 
     // Size checks
     if (description && Buffer.byteLength(description) > MAX_DESCRIPTION) {
@@ -580,6 +631,14 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       if (end !== undefined && !isValidDatetime(end)) {
         return res.status(400).json({ error: 'end must be a valid ISO 8601 datetime' });
       }
+      // Validate end >= start (using existing values for whichever isn't being updated)
+      if (start !== undefined || end !== undefined) {
+        const effectiveStart = new Date(start !== undefined ? start : evt.start_time);
+        const effectiveEnd = new Date(end !== undefined ? end : evt.end_time);
+        if (effectiveStart > effectiveEnd) {
+          return res.status(400).json({ error: 'end must be after start' });
+        }
+      }
     }
 
     // ---- Case A: Patching an instance (has parent_event_id) ----
@@ -599,7 +658,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       if (end !== undefined || (all_day !== undefined && endTime)) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
       if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
       if (status !== undefined) { updates.push(`status = $${idx++}`); values.push(status); }
-      if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
+      if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(cleanedAttendees)); }
       if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
 
       if (updates.length === 0) {
@@ -652,7 +711,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
       if (start !== undefined) { updates.push(`start_time = $${idx++}`); values.push(startTime || start); }
       if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
       if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
-      if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
+      if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(cleanedAttendees)); }
       if (recurrence !== undefined) { updates.push(`recurrence = $${idx++}`); values.push(recurrence); }
       if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
       // Don't allow setting status on a parent (it must stay 'recurring')
@@ -702,7 +761,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
         if (title !== undefined) { propagateUpdates.push(`title = $${pIdx++}`); propagateValues.push(title); }
         if (description !== undefined) { propagateUpdates.push(`description = $${pIdx++}`); propagateValues.push(description); }
         if (location !== undefined) { propagateUpdates.push(`location = $${pIdx++}`); propagateValues.push(location); }
-        if (attendees !== undefined) { propagateUpdates.push(`attendees = $${pIdx++}`); propagateValues.push(JSON.stringify(attendees)); }
+        if (attendees !== undefined) { propagateUpdates.push(`attendees = $${pIdx++}`); propagateValues.push(JSON.stringify(cleanedAttendees)); }
 
         if (propagateUpdates.length > 0) {
           propagateUpdates.push(`updated_at = now()`);
@@ -738,7 +797,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     if (end !== undefined) { updates.push(`end_time = $${idx++}`); values.push(endTime || end); }
     if (location !== undefined) { updates.push(`location = $${idx++}`); values.push(location); }
     if (status !== undefined) { updates.push(`status = $${idx++}`); values.push(status); }
-    if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(attendees)); }
+    if (attendees !== undefined) { updates.push(`attendees = $${idx++}`); values.push(JSON.stringify(cleanedAttendees)); }
     if (all_day !== undefined) { updates.push(`all_day = $${idx++}`); values.push(!!all_day); }
 
     if (updates.length === 0) {

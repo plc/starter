@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Attendee input validation** — `attendees` field now requires an array of valid email strings. Non-array values, non-string elements, and invalid emails are rejected with 400. Attendees are deduplicated case-insensitively and capped at 50 per event. Previously, invalid values could be stored and crash the iCal feed.
+- **End-before-start validation** — Timed events where `end` is before `start` are now rejected with 400. All-day events already had this check.
+- **Dangerous URI schemes in location** — `javascript:`, `data:`, `vbscript:`, and `file:` URIs are now rejected in event location fields to prevent stored XSS in calendar invite emails.
+- **Defensive iCal feed generation** — The iCal feed generator now gracefully handles malformed attendee data in the database instead of crashing the entire feed.
+
 ### Added
 - **Scoped `/man` with `?topic=` filter** — `GET /man` now supports `?topic=` to filter endpoints by category (`agents`, `smtp`, `calendars`, `events`, `feeds`, `errors`). Comma-separated for multiple topics. Discovery endpoints (`/man`, `/changelog`) are always included. Reduces token usage for agents with limited context windows.
 - **Error format documentation in `/man`** — `GET /man` response now includes `error_format` with the standard error shape, status codes, and notes. Also included in `?guide` mode so agents know what to expect from error responses.

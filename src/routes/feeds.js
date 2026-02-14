@@ -75,11 +75,20 @@ router.get('/:calendar_id.ics', async (req, res) => {
       const event = calendar.createEvent(eventOpts);
 
       if (evt.attendees) {
-        const attendees = typeof evt.attendees === 'string'
-          ? JSON.parse(evt.attendees)
-          : evt.attendees;
-        for (const email of attendees) {
-          event.createAttendee({ email });
+        let attendees;
+        try {
+          attendees = typeof evt.attendees === 'string'
+            ? JSON.parse(evt.attendees)
+            : evt.attendees;
+        } catch (_) {
+          attendees = null;
+        }
+        if (Array.isArray(attendees)) {
+          for (const email of attendees) {
+            if (typeof email === 'string') {
+              event.createAttendee({ email });
+            }
+          }
         }
       }
 
