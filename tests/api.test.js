@@ -1484,21 +1484,25 @@ describe('POST /man', { concurrency: 1 }, () => {
   });
 
   it('recommendation changes based on agent state', async () => {
-    // Create a fresh agent with no calendars
+    // Create a fresh agent (no name) — first recommendation is to name it
     const { data: fresh } = await api('POST', '/agents');
+    const { data: noNameData } = await api('GET', '/man?guide', { token: fresh.api_key });
+    assert.equal(noNameData.recommended_next_step.endpoint, 'PATCH /agents');
+
+    // Name the agent — next recommendation is to create a calendar
+    await api('PATCH', '/agents', { token: fresh.api_key, body: { name: 'Rec Agent' } });
     const { data: noCalData } = await api('GET', '/man?guide', { token: fresh.api_key });
     assert.equal(noCalData.recommended_next_step.endpoint, 'POST /calendars');
 
-    // Give it a calendar
+    // Give it a calendar (welcome event auto-created, event_count=1 means "create an event")
     const { data: cal } = await api('POST', '/calendars', {
       token: fresh.api_key,
       body: { name: 'Rec Test' },
     });
-    // Calendar now has a welcome event auto-created, so recommendation skips to upcoming
     const { data: noEvtData } = await api('GET', '/man?guide', { token: fresh.api_key });
-    assert.equal(noEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
+    assert.equal(noEvtData.recommended_next_step.endpoint, 'POST /calendars/:id/events');
 
-    // Give it an event
+    // Give it a user-created event (event_count>1) — recommendation shifts to upcoming
     await api('POST', `/calendars/${cal.calendar_id}/events`, {
       token: fresh.api_key,
       body: { title: 'Test', start: futureDate(1), end: futureDate(2) },
@@ -1968,9 +1972,15 @@ describe('API Changelog', { concurrency: 1 }, () => {
   });
 
   it('agent with name, description, and events gets no recommendations', async () => {
-    // state agent has name, description, calendars, and events from prior tests
+    // Earlier tests deleted their events, so create one to ensure event_count > 1
+    const { data: evt } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: { title: 'Persistent', start: futureDate(10), end: futureDate(11) },
+    });
     const { data } = await api('GET', '/changelog', { token: state.apiKey });
     assert.equal(data.recommendations, undefined, 'Fully set up agent should have no recommendations');
+    // Clean up
+    await api('DELETE', `/calendars/${state.calendarId}/events/${evt.id}`, { token: state.apiKey });
   });
 
   it('new agent without name gets recommendations with correct structure', async () => {
