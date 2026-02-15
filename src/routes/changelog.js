@@ -122,6 +122,33 @@ const CHANGELOG = [
     version: null,
     changes: [
       {
+        type: 'feature',
+        title: 'MCP server at full API parity',
+        description: 'Added 16 new MCP tools covering all documented API endpoints. The MCP server now exposes 24 tools: agent management (get_agent, update_agent), SMTP configuration (set/get/delete/test_smtp), full calendar CRUD (get/update/delete_calendar, test_webhook), event details (get_event, view_calendar), debugging (list/get_errors), and discovery (get_changelog, get_manual). Existing tools (create_event, update_event, create_calendar) also gained missing parameters: metadata, attendees, status, webhook config, and more.',
+        endpoints: ['MCP tools'],
+        docs: BASE + '/docs#mcp',
+      },
+      {
+        type: 'feature',
+        title: 'Remote MCP endpoint at /mcp',
+        description: 'CalDave now serves a remote MCP endpoint via Streamable HTTP transport. Agents can connect with just a URL and API key — no local installation or cloning required. Configure as: { "url": "https://caldave.ai/mcp", "headers": { "Authorization": "Bearer sk_live_..." } }. Sessions are stateful with automatic 30-minute TTL cleanup.',
+        endpoints: ['POST /mcp', 'GET /mcp', 'DELETE /mcp'],
+        docs: BASE + '/docs#mcp',
+      },
+      {
+        type: 'feature',
+        title: 'MCP agent guide resource',
+        description: 'The MCP server now includes a caldave://guide resource — a comprehensive getting-started guide for agents with setup checklist, code examples, event field reference, webhook/SMTP configuration, and tool catalog. MCP instructions have also been rewritten with structured quick-start, workflow descriptions, and tool selection guide.',
+        endpoints: ['MCP resources'],
+        docs: BASE + '/docs#mcp',
+      },
+    ],
+  },
+  {
+    date: '2026-02-15',
+    version: null,
+    changes: [
+      {
         type: 'fix',
         title: 'Attendee input validation',
         description: 'attendees must be an array of valid email strings. Non-array values, non-string elements, and invalid emails are rejected with 400. Attendees are deduplicated case-insensitively and capped at 50 per event. Previously, invalid values could be stored and crash the iCal feed.',

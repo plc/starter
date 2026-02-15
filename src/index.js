@@ -165,6 +165,12 @@ curl -s "https://${DOMAIN}/man?guide"</code></pre>
   res.send(html);
 });
 
+// Remote MCP endpoint (Streamable HTTP transport, auth handled internally)
+// Mounted via dynamic import in start() since route file is ESM
+app.post('/mcp', (req, res, next) => { if (app._mcpHandlers) app._mcpHandlers.handlePost(req, res).catch(next); else res.status(503).json({ error: 'MCP endpoint loading' }); });
+app.get('/mcp', (req, res, next) => { if (app._mcpHandlers) app._mcpHandlers.handleGet(req, res).catch(next); else res.status(503).json({ error: 'MCP endpoint loading' }); });
+app.delete('/mcp', (req, res, next) => { if (app._mcpHandlers) app._mcpHandlers.handleDelete(req, res).catch(next); else res.status(503).json({ error: 'MCP endpoint loading' }); });
+
 // API documentation, quick start, and legal pages (no auth)
 app.use('/docs', docsRouter);
 app.use('/quickstart', quickstartRouter);
@@ -279,6 +285,15 @@ async function start() {
   } catch (err) {
     console.error('Failed to initialize schema:', err.message);
     console.error('Server starting without schema — DB may not be ready yet');
+  }
+
+  // Load ESM MCP route handlers
+  try {
+    const mcpHandlers = await import('./routes/mcp.mjs');
+    app._mcpHandlers = mcpHandlers;
+    console.log('MCP HTTP endpoint loaded at /mcp');
+  } catch (err) {
+    console.error('Failed to load MCP HTTP route:', err.message);
   }
 
   // Extend materialization horizons for recurring events

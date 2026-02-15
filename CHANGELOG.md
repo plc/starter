@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **MCP server at full parity with API** — Added 16 new MCP tools covering all documented API endpoints. Previously the MCP server only had 8 core tools; it now exposes 24 tools matching every REST endpoint:
+  - **Agent management**: `caldave_get_agent`, `caldave_update_agent`
+  - **SMTP configuration**: `caldave_set_smtp`, `caldave_get_smtp`, `caldave_delete_smtp`, `caldave_test_smtp`
+  - **Calendar management**: `caldave_get_calendar`, `caldave_update_calendar`, `caldave_delete_calendar`, `caldave_test_webhook`
+  - **Event tools**: `caldave_get_event`, `caldave_view_calendar`
+  - **Debugging**: `caldave_list_errors`, `caldave_get_error`
+  - **Discovery**: `caldave_get_changelog`, `caldave_get_manual`
+- **Missing parameters on existing MCP tools** — `caldave_create_event` now supports `metadata`, `attendees`, and `status`. `caldave_update_event` now supports `metadata`, `attendees`, and `recurrence`. `caldave_create_calendar` now supports `webhook_url`, `webhook_secret`, `webhook_offsets`, `agentmail_api_key`, and `welcome_event`.
+- **Remote MCP endpoint at `/mcp`** — CalDave now serves an MCP endpoint via Streamable HTTP transport. Agents can connect with just a URL and API key (`{ "url": "https://caldave.ai/mcp", "headers": { "Authorization": "Bearer sk_live_..." } }`) — no local installation required. Sessions are stateful with automatic 30-minute TTL cleanup.
+- **MCP agent guide** — Enhanced MCP instructions with structured quick-start, workflow descriptions, and tool selection guide. Added `caldave://guide` MCP resource with a comprehensive getting-started guide for agents (setup checklist, code examples, event fields reference, webhook/SMTP config, debugging).
+
 ### Improved
 - **Auth performance** — Added missing database index on `agents.api_key_hash`. Auth lookups now use an index scan instead of a full table scan on every authenticated request.
 - **`/docs` caching** — Static HTML documentation is pre-computed at startup and served with `Cache-Control: public, max-age=86400`. Eliminates ~30KB of string construction per request.

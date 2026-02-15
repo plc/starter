@@ -520,20 +520,81 @@ For AgentMail, set the `agentmail_api_key` on the calendar via `POST /calendars`
 
 For agents using MCP, CalDave exposes these tools:
 
+**Agent Management**
+
 | Tool | Description |
 |------|-------------|
-| `caldave_create_calendar` | Create a new calendar. Returns calendar ID, email, and feed URL. |
+| `caldave_get_agent` | Get the authenticated agent profile (name, description, created_at). |
+| `caldave_update_agent` | Update agent name or description. Name appears in outbound email From headers. |
+
+**SMTP Configuration**
+
+| Tool | Description |
+|------|-------------|
+| `caldave_set_smtp` | Configure SMTP for outbound invite/RSVP emails. |
+| `caldave_get_smtp` | View SMTP configuration (password excluded). |
+| `caldave_delete_smtp` | Remove SMTP configuration. Reverts to CalDave built-in delivery. |
+| `caldave_test_smtp` | Send a test email to verify SMTP configuration. |
+
+**Calendars**
+
+| Tool | Description |
+|------|-------------|
 | `caldave_list_calendars` | List all calendars for this agent. |
-| `caldave_get_upcoming` | Get next N events from a calendar. |
-| `caldave_create_event` | Create an event on a calendar. |
-| `caldave_update_event` | Update an existing event. |
+| `caldave_get_calendar` | Get a single calendar by ID with full details. |
+| `caldave_create_calendar` | Create a new calendar. Returns calendar ID, email, and feed URL. |
+| `caldave_update_calendar` | Update calendar settings (name, timezone, webhook config). |
+| `caldave_delete_calendar` | Delete a calendar and all its events. |
+| `caldave_test_webhook` | Send a test payload to the calendar webhook URL. |
+
+**Events**
+
+| Tool | Description |
+|------|-------------|
+| `caldave_get_upcoming` | Get next N events from a calendar. Designed for agent polling. |
+| `caldave_list_events` | List events with optional date range and status filters. |
+| `caldave_get_event` | Get a single event by ID. |
+| `caldave_view_calendar` | Plain text table of upcoming events for quick inspection. |
+| `caldave_create_event` | Create an event. Supports recurring (RRULE), metadata, and attendees. |
+| `caldave_update_event` | Update an existing event. Supports metadata, attendees, and recurrence changes. |
 | `caldave_delete_event` | Delete an event. |
 | `caldave_respond_to_invite` | Accept/decline an inbound invite. |
-| `caldave_list_events` | List events with optional date range and status filters. |
+
+**Debugging & Discovery**
+
+| Tool | Description |
+|------|-------------|
+| `caldave_list_errors` | Query recent API errors for your agent. |
+| `caldave_get_error` | Get a single error with full stack trace. |
+| `caldave_get_changelog` | API changelog with personalized recommendations. |
+| `caldave_get_manual` | Machine-readable API manual with all endpoints and curl examples. |
 
 ### Configuration
 
-The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP client:
+CalDave supports two MCP transports:
+
+#### Option 1: Remote URL (Recommended)
+
+No installation needed. Point your MCP client at the CalDave server URL:
+
+```json
+{
+  "mcpServers": {
+    "caldave": {
+      "url": "https://caldave.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer sk_live_..."
+      }
+    }
+  }
+}
+```
+
+The remote endpoint uses Streamable HTTP transport with session management. Auth is via your API key in the `Authorization` header.
+
+#### Option 2: Local STDIO
+
+For local development or offline use, run the STDIO server directly:
 
 **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 ```json
@@ -543,7 +604,8 @@ The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP cl
       "command": "node",
       "args": ["/path/to/caldave/src/mcp.mjs"],
       "env": {
-        "CALDAVE_API_KEY": "sk_live_..."
+        "CALDAVE_API_KEY": "sk_live_...",
+        "CALDAVE_URL": "https://caldave.ai"
       }
     }
   }
@@ -558,7 +620,8 @@ The MCP server (`src/mcp.mjs`) uses STDIO transport. Configure it in your MCP cl
       "command": "node",
       "args": ["/path/to/caldave/src/mcp.mjs"],
       "env": {
-        "CALDAVE_API_KEY": "sk_live_..."
+        "CALDAVE_API_KEY": "sk_live_...",
+        "CALDAVE_URL": "https://caldave.ai"
       }
     }
   }
