@@ -116,12 +116,12 @@ app.get('/', (req, res) => {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
     .container { max-width: 540px; width: 100%; }
-    h1 { font-size: 2.5rem; color: #fff; margin-bottom: 0.75rem; }
-    .tagline { font-size: 1.125rem; color: #94a3b8; line-height: 1.6; margin-bottom: 2rem; }
+    h1 { font-size: 2.5rem; color: #fff; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 1.25rem; color: #94a3b8; margin-bottom: 2rem; }
     .features { list-style: none; margin-bottom: 2rem; }
     .features li { padding: 0.5rem 0; color: #cbd5e1; font-size: 0.9375rem; display: flex; align-items: baseline; gap: 0.75rem; }
     .features li::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; flex-shrink: 0; position: relative; top: -1px; }
-    .links { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
     .links a { display: inline-block; padding: 0.625rem 1.25rem; border-radius: 8px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.15s; }
     .links .primary { background: #2563eb; color: #fff; }
     .links .primary:hover { background: #3b82f6; }
@@ -137,15 +137,18 @@ app.get('/', (req, res) => {
   <div class="container">
     <img src="/logo.png" alt="CalDave" class="logo">
     <h1>CalDave</h1>
-    <p class="tagline">A calendar API for AI agents. Create calendars, manage events, receive invites from humans via email, and subscribe from Google Calendar.</p>
+    <p class="subtitle">A complete calendar for agents.</p>
 
     <ul class="features">
-      <li>REST API with Bearer token auth</li>
-      <li>Per-calendar email addresses for receiving invites</li>
-      <li>iCal feeds compatible with Google Calendar and Apple Calendar</li>
-      <li>Recurring events with RRULE support</li>
-      <li>Polling endpoint for agent scheduling</li>
-      <li>Inbound email via Postmark or AgentMail</li>
+      <li>Agents create and manage calendars entirely on their own</li>
+      <li>Humans can claim agent calendars to manage keys and access</li>
+      <li>Invites, acceptances, modifications, cancellations, and recurring events</li>
+      <li>Webhooks notify your server when events are added or changed</li>
+      <li>AgentMail integration for inbound email forwarding</li>
+      <li>Custom SMTP so invites come from your own address</li>
+      <li>Agentic documentation and changelog that notify agents of improvements</li>
+      <li>iCal feeds to view and subscribe from Google Calendar or Apple Calendar</li>
+      <li>Built-in error log and debugging tools scoped to each agent</li>
     </ul>
 
     <pre><code><span class="dim"># Get started in seconds</span>
@@ -155,6 +158,8 @@ curl -s "https://${DOMAIN}/man?guide"</code></pre>
 
     <div class="links">
       <a href="/docs" class="primary">API Docs</a>
+      <a href="/signup" class="primary">Sign Up</a>
+      <a href="/login" class="secondary">Log In</a>
     </div>
 
     <footer style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid #334155; text-align:center; font-size:0.8125rem; color:#64748b;">
