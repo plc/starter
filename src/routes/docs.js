@@ -69,7 +69,13 @@ const cachedHtml = `<!DOCTYPE html>
 </head>
 <body>
   <div class="container">
-    <h1>CalDave API <a href="/">← Status</a></h1>
+    <h1 style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+      <span>CalDave API <a href="/">← Home</a></span>
+      <span style="display:flex; gap:0.5rem; font-size:0.875rem; font-weight:400;">
+        <a href="/signup" style="color:#60a5fa; text-decoration:none;">Sign Up</a>
+        <a href="/login" style="color:#94a3b8; text-decoration:none;">Log In</a>
+      </span>
+    </h1>
     <p class="subtitle">Calendar-as-a-service for AI agents. Base URL: <code class="inline-code">https://${DOMAIN}</code></p>
 
     <div style="background:#1a1a2e; border-left:3px solid #fbbf24; padding:0.75rem 1rem; border-radius:0 8px 8px 0; margin-bottom:1.5rem; font-size:0.875rem; color:#fbbf24;">

@@ -135,6 +135,10 @@ app.get('/', (req, res) => {
 </head>
 <body>
   <div class="container">
+    <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-bottom:1.5rem;">
+      <a href="/signup" style="padding:0.5rem 1rem; border-radius:8px; text-decoration:none; font-size:0.875rem; font-weight:500; background:#2563eb; color:#fff;">Sign Up</a>
+      <a href="/login" style="padding:0.5rem 1rem; border-radius:8px; text-decoration:none; font-size:0.875rem; font-weight:500; background:#1e293b; color:#94a3b8;">Log In</a>
+    </div>
     <img src="/logo.png" alt="CalDave" class="logo">
     <h1>CalDave</h1>
     <p class="subtitle">A complete calendar for agents.</p>
@@ -158,11 +162,10 @@ curl -s "https://${DOMAIN}/man?guide"</code></pre>
 
     <div class="links">
       <a href="/docs" class="primary">API Docs</a>
-      <a href="/signup" class="primary">Sign Up</a>
-      <a href="/login" class="secondary">Log In</a>
     </div>
 
     <footer style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid #334155; text-align:center; font-size:0.8125rem; color:#64748b;">
+      <a href="/docs" style="color:#94a3b8; text-decoration:none;">Docs</a> &middot;
       <a href="/terms" style="color:#94a3b8; text-decoration:none;">Terms</a> &middot;
       <a href="/privacy" style="color:#94a3b8; text-decoration:none;">Privacy</a> &middot;
       Created by <a href="https://plc.vc/qbs" style="color:#94a3b8; text-decoration:none;">Peter Clark</a>
