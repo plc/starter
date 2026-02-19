@@ -14,11 +14,12 @@
 
 const { Router } = require('express');
 const { pool } = require('../db');
-const { agentId, apiKey } = require('../lib/ids');
+const { agentId, apiKey, humanAgentId } = require('../lib/ids');
 const { hashKey } = require('../lib/keys');
 const { logError } = require('../lib/errors');
 const { notify } = require('../lib/notify');
 const auth = require('../middleware/auth');
+const { optionalHumanKeyAuth, humanKeyAuth } = require('../middleware/humanAuth');
 
 const router = Router();
 
@@ -35,8 +36,9 @@ const ALLOWED_PATCH_FIELDS = new Set(['name', 'description']);
  * POST /agents
  * Create a new agent. No authentication required.
  * Optionally accepts name and description.
+ * Optionally accepts X-Human-Key header to auto-associate with a human account.
  */
-router.post('/', async (req, res) => {
+router.post('/', optionalHumanKeyAuth, async (req, res) => {
   try {
     const id = agentId();
     const key = apiKey();
@@ -71,6 +73,14 @@ router.post('/', async (req, res) => {
       [id, hash, name, description]
     );
 
+    // Auto-associate with human account if X-Human-Key header was provided
+    if (req.human) {
+      await pool.query(
+        'INSERT INTO human_agents (id, human_id, agent_id) VALUES ($1, $2, $3)',
+        [humanAgentId(), req.human.id, id]
+      );
+    }
+
     const response = {
       agent_id: id,
       api_key: key,
@@ -78,6 +88,7 @@ router.post('/', async (req, res) => {
     };
     if (name) response.name = name;
     if (description) response.description = description;
+    if (req.human) response.owned_by = req.human.id;
 
     notify('agent_created', { agent_id: id, name: name || '(unnamed)' });
 
@@ -85,6 +96,59 @@ router.post('/', async (req, res) => {
   } catch (err) {
     logError(err, { route: 'POST /agents', method: 'POST' });
     res.status(500).json({ error: 'Failed to create agent' });
+  }
+});
+
+/**
+ * POST /agents/claim
+ * Claim an existing agent by providing its API key.
+ * Requires X-Human-Key header for human authentication.
+ * Body: { "api_key": "sk_live_..." }
+ */
+router.post('/claim', humanKeyAuth, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const agentKey = body.api_key;
+
+    if (!agentKey || typeof agentKey !== 'string' || !agentKey.startsWith('sk_live_')) {
+      return res.status(400).json({ error: 'api_key is required (must start with sk_live_)' });
+    }
+
+    const hash = hashKey(agentKey);
+    const { rows: agentRows } = await pool.query(
+      'SELECT id, name FROM agents WHERE api_key_hash = $1',
+      [hash]
+    );
+
+    if (agentRows.length === 0) {
+      return res.status(400).json({ error: 'Invalid API key — no agent found' });
+    }
+
+    const agent = agentRows[0];
+
+    // Check if already claimed by this human
+    const existing = await pool.query(
+      'SELECT id FROM human_agents WHERE human_id = $1 AND agent_id = $2',
+      [req.human.id, agent.id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'You already own this agent' });
+    }
+
+    await pool.query(
+      'INSERT INTO human_agents (id, human_id, agent_id) VALUES ($1, $2, $3)',
+      [humanAgentId(), req.human.id, agent.id]
+    );
+
+    res.json({
+      agent_id: agent.id,
+      agent_name: agent.name,
+      claimed: true,
+      owned_by: req.human.id,
+    });
+  } catch (err) {
+    logError(err, { route: 'POST /agents/claim', method: 'POST', human_id: req.human?.id });
+    res.status(500).json({ error: 'Failed to claim agent' });
   }
 });
 

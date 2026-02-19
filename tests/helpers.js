@@ -15,11 +15,13 @@ const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:3720';
  * @param {object} [opts.body]   — JSON body (auto-stringified)
  * @param {string} [opts.token]  — Bearer token
  * @param {boolean} [opts.raw]   — if true, return raw response text instead of parsed JSON
+ * @param {object} [opts.headers] — additional headers to include
  */
-async function api(method, path, { body, token, raw } = {}) {
+async function api(method, path, { body, token, raw, headers: extraHeaders } = {}) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (extraHeaders) Object.assign(headers, extraHeaders);
 
   const res = await fetch(`${BASE_URL}${path}`, {
     method,

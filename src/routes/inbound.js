@@ -29,6 +29,7 @@ const {
   MATERIALIZE_WINDOW_DAYS,
 } = require('../lib/recurrence');
 const { logError } = require('../lib/errors');
+const { fireWebhook } = require('../lib/webhooks');
 
 const router = Router();
 
@@ -374,6 +375,7 @@ async function processInboundEmail(calendar, body, res) {
     );
 
     console.log(`Inbound email (${provider}): cancelled event ${existing[0].id} for calendar ${calendar.id}`);
+    fireWebhook(calendar.id, 'event.deleted', { id: existing[0].id });
     return res.json({ status: 'cancelled', event_id: existing[0].id });
   }
 
@@ -428,10 +430,12 @@ async function processInboundEmail(calendar, body, res) {
             const { rows: updated } = await pool.query('SELECT * FROM events WHERE id = $1', [evt.id]);
             const instancesCreated = await rematerialize(pool, updated[0]);
             console.log(`Inbound email (${provider}): updated recurring event ${evt.id} (${instancesCreated} instances rematerialized) for calendar ${calendar.id}`);
+            fireWebhook(calendar.id, 'event.updated', { id: evt.id });
             return res.json({ status: 'updated', event_id: evt.id, instances_created: instancesCreated });
           }
 
           console.log(`Inbound email (${provider}): updated recurring event ${evt.id} for calendar ${calendar.id}`);
+          fireWebhook(calendar.id, 'event.updated', { id: evt.id });
           return res.json({ status: 'updated', event_id: evt.id });
         }
 
@@ -461,6 +465,7 @@ async function processInboundEmail(calendar, body, res) {
         );
 
         console.log(`Inbound email (${provider}): updated event ${evt.id} for calendar ${calendar.id}`);
+        fireWebhook(calendar.id, 'event.updated', { id: evt.id });
         return res.json({ status: 'updated', event_id: evt.id });
       }
     }
@@ -509,6 +514,7 @@ async function processInboundEmail(calendar, body, res) {
         await updateMaterializedUntil(pool, parentEvent.id, horizon);
 
         console.log(`Inbound email (${provider}): created recurring event ${id} (${instancesCreated} instances) for calendar ${calendar.id}`);
+        fireWebhook(calendar.id, 'event.created', { id });
         return res.json({ status: 'created', event_id: id, recurrence, instances_created: instancesCreated });
       }
     }
@@ -535,6 +541,7 @@ async function processInboundEmail(calendar, body, res) {
     );
 
     console.log(`Inbound email (${provider}): created event ${id} for calendar ${calendar.id}`);
+    fireWebhook(calendar.id, 'event.created', { id });
     return res.json({ status: 'created', event_id: id });
   }
 

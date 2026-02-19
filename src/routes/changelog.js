@@ -105,6 +105,25 @@ async function buildRecommendations(agent) {
         });
       }
     }
+
+    // Check if the agent is claimed by a human account
+    if (rows.length > 0) {
+      const { rows: claimed } = await pool.query(
+        'SELECT 1 FROM human_agents WHERE agent_id = $1 LIMIT 1',
+        [agent.id]
+      );
+      if (claimed.length === 0) {
+        const totalEvents = rows.reduce((sum, r) => sum + parseInt(r.event_count, 10), 0);
+        if (totalEvents > 1) {
+          recs.push({
+            action: 'Claim this agent with a human account',
+            why: 'This agent has ' + rows.length + (rows.length === 1 ? ' calendar' : ' calendars') + ' and ' + totalEvents + ' events but isn\'t claimed by a human account. Claiming lets you manage API keys from a dashboard and prevents losing access.',
+            how: 'Sign up at /signup, then use POST /agents/claim with X-Human-Key header and your agent\'s sk_live_ key in the body.',
+            docs: BASE + '/docs#human-accounts',
+          });
+        }
+      }
+    }
   } catch {
     // If calendar query fails, skip calendar-based recommendations
   }
@@ -117,6 +136,26 @@ async function buildRecommendations(agent) {
 // ---------------------------------------------------------------------------
 
 const CHANGELOG = [
+  {
+    date: '2026-02-18',
+    version: null,
+    changes: [
+      {
+        type: 'feature',
+        title: 'Webhook delivery on event mutations',
+        description: 'Calendars with a webhook_url now receive automatic webhooks when events are created, updated, deleted, or responded to. Works for both API operations and inbound email invites. Event types: event.created, event.updated, event.deleted, event.responded. Payloads are signed with HMAC-SHA256 if webhook_secret is set. Delivery is fire-and-forget.',
+        endpoints: [],
+        docs: BASE + '/docs#webhook-events',
+      },
+      {
+        type: 'feature',
+        title: 'Human accounts with agent key claiming',
+        description: 'Humans can sign up, log in, and manage their agent keys from a web dashboard. Claim agents by providing the agent secret key (sk_live_...) — no calendar invites needed. Human API keys (hk_live_...) can be passed via X-Human-Key header to POST /agents to auto-associate new agents, or to POST /agents/claim to claim existing agents programmatically.',
+        endpoints: ['GET /signup', 'POST /signup', 'GET /login', 'POST /login', 'GET /dashboard', 'POST /dashboard/claim', 'POST /agents/claim'],
+        docs: BASE + '/docs#human-accounts',
+      },
+    ],
+  },
   {
     date: '2026-02-15',
     version: null,
@@ -403,7 +442,7 @@ const CHANGELOG = [
       {
         type: 'feature',
         title: 'Inbound email — multi-provider support',
-        description: 'Inbound webhooks support both Postmark (inline base64 attachments) and AgentMail (attachment fetch via API). Set agentmail_api_key on the calendar for AgentMail.',
+        description: 'Inbound email supports both Postmark (inline base64 attachments) and AgentMail (attachment fetch via API). Set agentmail_api_key on the calendar for AgentMail.',
         endpoints: ['POST /inbound/:token'],
         docs: BASE + '/docs#inbound',
       },
@@ -436,7 +475,7 @@ const CHANGELOG = [
       {
         type: 'feature',
         title: 'Inbound email support',
-        description: 'Each calendar gets a unique email address and inbound webhook URL. Forward .ics invites to create events with source: inbound_email and status: tentative.',
+        description: 'Each calendar gets a unique email address and inbound URL. Forward .ics invites to create events with source: inbound_email and status: tentative.',
         endpoints: ['POST /inbound/:token'],
         docs: BASE + '/docs#inbound',
       },

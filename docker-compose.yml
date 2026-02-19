@@ -32,6 +32,7 @@ services:
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     environment:
+      - NODE_ENV=${NODE_ENV:-development}
       - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-caldave}
       - PORT=${PORT:-3000}
       - INBOUND_WEBHOOK_SECRET=${INBOUND_WEBHOOK_SECRET:-}

@@ -1752,13 +1752,13 @@ describe('POST /man', { concurrency: 1 }, () => {
     const { data: noEvtData } = await api('GET', '/man?guide', { token: fresh.api_key });
     assert.equal(noEvtData.recommended_next_step.endpoint, 'POST /calendars/:id/events');
 
-    // Give it a user-created event (event_count>1) — recommendation shifts to upcoming
+    // Give it a user-created event (event_count>1) — recommendation shifts to claim (unclaimed agent)
     await api('POST', `/calendars/${cal.calendar_id}/events`, {
       token: fresh.api_key,
       body: { title: 'Test', start: futureDate(1), end: futureDate(2) },
     });
     const { data: hasEvtData } = await api('GET', '/man?guide', { token: fresh.api_key });
-    assert.equal(hasEvtData.recommended_next_step.endpoint, 'GET /calendars/:id/upcoming');
+    assert.equal(hasEvtData.recommended_next_step.endpoint, 'POST /agents/claim');
 
     // Clean up
     await api('DELETE', `/calendars/${cal.calendar_id}`, { token: fresh.api_key });
@@ -2221,14 +2221,17 @@ describe('API Changelog', { concurrency: 1 }, () => {
     assert.equal(data.recommendations, undefined);
   });
 
-  it('agent with name, description, and events gets no recommendations', async () => {
+  it('agent with name, description, and events gets claim recommendation', async () => {
     // Earlier tests deleted their events, so create one to ensure event_count > 1
     const { data: evt } = await api('POST', `/calendars/${state.calendarId}/events`, {
       token: state.apiKey,
       body: { title: 'Persistent', start: futureDate(10), end: futureDate(11) },
     });
     const { data } = await api('GET', '/changelog', { token: state.apiKey });
-    assert.equal(data.recommendations, undefined, 'Fully set up agent should have no recommendations');
+    // Test agent is unclaimed, so it should get the claim recommendation
+    assert.ok(Array.isArray(data.recommendations), 'Unclaimed agent with events should get recommendations');
+    const claimRec = data.recommendations.find(r => r.action.toLowerCase().includes('claim'));
+    assert.ok(claimRec, 'Should recommend claiming the agent');
     // Clean up
     await api('DELETE', `/calendars/${state.calendarId}/events/${evt.id}`, { token: state.apiKey });
   });
@@ -2291,7 +2294,278 @@ describe('SMTP test endpoint', { concurrency: 1 }, () => {
 });
 
 // ---------------------------------------------------------------------------
-// 29. Cleanup
+// 29. Human accounts + agent claiming
+// ---------------------------------------------------------------------------
+
+describe('Human accounts and agent claiming', { concurrency: 1 }, () => {
+  const humanState = {
+    humanKey: null,
+    agentId: null,
+    agentKey: null,
+  };
+
+  // Create a fresh agent to claim
+  before(async () => {
+    const { data } = await api('POST', '/agents', {
+      body: { name: 'Claimable Agent' },
+    });
+    humanState.agentId = data.agent_id;
+    humanState.agentKey = data.api_key;
+  });
+
+  it('POST /signup creates a human account', async () => {
+    const email = `test-${Date.now()}@example.com`;
+    const res = await fetch(`${require('./helpers').BASE_URL}/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `name=Test+Human&email=${encodeURIComponent(email)}&password=testpassword123`,
+      redirect: 'manual',
+    });
+    // Signup redirects to /dashboard?new_key=hk_live_...
+    assert.equal(res.status, 302);
+    const location = res.headers.get('location');
+    assert.ok(location.includes('/dashboard'));
+    assert.ok(location.includes('new_key='));
+
+    // Extract the human key from the redirect URL
+    const url = new URL(location, 'http://localhost');
+    humanState.humanKey = url.searchParams.get('new_key');
+    assert.ok(humanState.humanKey);
+    assert.match(humanState.humanKey, /^hk_live_/);
+  });
+
+  it('POST /agents/claim without X-Human-Key returns 401', async () => {
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: humanState.agentKey },
+    });
+    assert.equal(status, 401);
+    assert.ok(data.error.includes('Missing X-Human-Key'));
+  });
+
+  it('POST /agents/claim with invalid X-Human-Key returns 401', async () => {
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: humanState.agentKey },
+      headers: { 'X-Human-Key': 'hk_live_invalid_key_here_1234567890ab' },
+    });
+    assert.equal(status, 401);
+    assert.equal(data.error, 'Invalid human key');
+  });
+
+  it('POST /agents/claim without api_key returns 400', async () => {
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: {},
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('api_key is required'));
+  });
+
+  it('POST /agents/claim with invalid api_key prefix returns 400', async () => {
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: 'not_a_valid_key' },
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('api_key is required'));
+  });
+
+  it('POST /agents/claim with non-existent agent key returns 400', async () => {
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: 'sk_live_NONE' },
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('no agent found'));
+  });
+
+  it('POST /agents/claim with valid credentials claims the agent', async () => {
+    assert.ok(humanState.agentKey, 'Agent must exist (before() may have been rate-limited)');
+
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: humanState.agentKey },
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    assert.equal(status, 200);
+    assert.equal(data.agent_id, humanState.agentId);
+    assert.equal(data.agent_name, 'Claimable Agent');
+    assert.equal(data.claimed, true);
+    assert.ok(data.owned_by);
+  });
+
+  it('POST /agents/claim same agent again returns already owned', async () => {
+    assert.ok(humanState.agentKey, 'Depends on prior claim test');
+
+    const { status, data } = await api('POST', '/agents/claim', {
+      body: { api_key: humanState.agentKey },
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('already own'));
+  });
+
+  it('POST /agents with X-Human-Key auto-associates the new agent', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'Auto Claimed' },
+      headers: { 'X-Human-Key': humanState.humanKey },
+    });
+    if (status === 429) return; // Rate-limited — skip gracefully
+    assert.equal(status, 201);
+    assert.ok(data.agent_id);
+    assert.equal(data.name, 'Auto Claimed');
+
+    // The agent should now be claimed — verify via /man recommendation
+    const { data: manData } = await api('GET', '/man?guide', { token: data.api_key });
+    assert.equal(manData.your_context.claimed, true);
+  });
+
+  it('POST /agents with invalid X-Human-Key returns 401', async () => {
+    const { status, data } = await api('POST', '/agents', {
+      body: { name: 'Should Fail' },
+      headers: { 'X-Human-Key': 'hk_live_invalid_key_here_1234567890ab' },
+    });
+    if (status === 429) return; // Rate-limited — skip gracefully
+    assert.equal(status, 401);
+    assert.equal(data.error, 'Invalid human key');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 30. Calendar view (plain text)
+// ---------------------------------------------------------------------------
+
+describe('Calendar view', { concurrency: 1 }, () => {
+  it('GET /calendars/:id/view returns text/plain', async () => {
+    // Use the main test calendar
+    const { status, data, headers } = await api('GET', `/calendars/${state.calendarId}/view`, {
+      token: state.apiKey,
+      raw: true,
+    });
+    assert.equal(status, 200);
+    assert.ok(headers.get('content-type').includes('text/plain'));
+    assert.ok(typeof data === 'string');
+    // Should include the calendar name and column headers
+    assert.ok(data.includes('TITLE'));
+    assert.ok(data.includes('START'));
+    assert.ok(data.includes('STATUS'));
+    assert.ok(data.includes('event(s)'));
+  });
+
+  it('GET /calendars/:id/view respects limit parameter', async () => {
+    const { status, data } = await api('GET', `/calendars/${state.calendarId}/view?limit=1`, {
+      token: state.apiKey,
+      raw: true,
+    });
+    assert.equal(status, 200);
+    assert.ok(typeof data === 'string');
+  });
+
+  it('GET /calendars/:id/view returns 404 for non-existent calendar', async () => {
+    const { status, data } = await api('GET', '/calendars/cal_nonexistent/view', {
+      token: state.apiKey,
+      raw: true,
+    });
+    assert.equal(status, 404);
+    assert.ok(data.includes('not found'));
+  });
+
+  it('GET /calendars/:id/view requires auth', async () => {
+    const { status } = await api('GET', `/calendars/${state.calendarId}/view`);
+    assert.equal(status, 401);
+  });
+
+  it('GET /calendars/:id/view shows future events', async () => {
+    // Create a future event to ensure it shows up
+    const { data: evt } = await api('POST', `/calendars/${state.calendarId}/events`, {
+      token: state.apiKey,
+      body: {
+        title: 'View Test Event',
+        start: futureDate(48),
+        end: futureDate(49),
+        location: 'Test Room',
+      },
+    });
+    assert.ok(evt.id);
+
+    const { data: viewText } = await api('GET', `/calendars/${state.calendarId}/view`, {
+      token: state.apiKey,
+      raw: true,
+    });
+    assert.ok(viewText.includes('View Test Event'));
+    assert.ok(viewText.includes('Test Room'));
+
+    // Cleanup
+    await api('DELETE', `/calendars/${state.calendarId}/events/${evt.id}`, { token: state.apiKey });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 31. Webhook test endpoint
+// ---------------------------------------------------------------------------
+
+describe('Webhook test endpoint', { concurrency: 1 }, () => {
+  it('POST /calendars/:id/webhook/test without webhook_url returns 400', async () => {
+    // First make sure no webhook_url is set
+    await api('PATCH', `/calendars/${state.calendarId}`, {
+      token: state.apiKey,
+      body: { webhook_url: null },
+    });
+
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/webhook/test`, {
+      token: state.apiKey,
+    });
+    assert.equal(status, 400);
+    assert.ok(data.error.includes('No webhook_url configured'));
+  });
+
+  it('POST /calendars/:id/webhook/test with unreachable URL returns failure', async () => {
+    // Set a webhook_url that will fail to connect
+    await api('PATCH', `/calendars/${state.calendarId}`, {
+      token: state.apiKey,
+      body: { webhook_url: 'https://localhost:19999/nonexistent' },
+    });
+
+    const { status, data } = await api('POST', `/calendars/${state.calendarId}/webhook/test`, {
+      token: state.apiKey,
+    });
+    assert.equal(status, 200); // Returns 200 even on delivery failure
+    assert.equal(data.success, false);
+    assert.ok(data.message.includes('Failed to reach'));
+    assert.equal(data.webhook_url, 'https://localhost:19999/nonexistent');
+  });
+
+  it('POST /calendars/:id/webhook/test requires auth', async () => {
+    const { status } = await api('POST', `/calendars/${state.calendarId}/webhook/test`);
+    assert.equal(status, 401);
+  });
+
+  it('POST /calendars/:id/webhook/test returns 404 for other agent calendar', async () => {
+    // Use a different valid agent token — the calendar shouldn't be accessible
+    const { data: other } = await api('POST', '/agents');
+    if (other.api_key) {
+      const { status } = await api('POST', `/calendars/${state.calendarId}/webhook/test`, {
+        token: other.api_key,
+      });
+      assert.equal(status, 404);
+    } else {
+      // Rate-limited — test with an invalid token instead (returns 401)
+      const { status } = await api('POST', `/calendars/${state.calendarId}/webhook/test`, {
+        token: 'sk_live_NONE',
+      });
+      assert.equal(status, 401);
+    }
+  });
+
+  // Clean up: remove webhook_url
+  after(async () => {
+    await api('PATCH', `/calendars/${state.calendarId}`, {
+      token: state.apiKey,
+      body: { webhook_url: null },
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 32. Cleanup
 // ---------------------------------------------------------------------------
 
 describe('Cleanup', { concurrency: 1 }, () => {

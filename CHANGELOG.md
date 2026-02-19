@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Webhook delivery on event mutations** — Calendars with a `webhook_url` now receive automatic webhooks when events are created, updated, deleted, or responded to. Works for both API operations and inbound email invites. Event types: `event.created`, `event.updated`, `event.deleted`, `event.responded`. Payloads are signed with HMAC-SHA256 if `webhook_secret` is set. Delivery is fire-and-forget (no retries).
+- **Human accounts with agent key claiming** — Humans can sign up at `/signup`, log in at `/login`, and manage their agent keys from a `/dashboard`. Agents are claimed by providing the agent's secret key (`sk_live_...`) — if you have the key, you own it. No calendar invites needed.
+  - **Human API keys** (`hk_live_...`) — pass via `X-Human-Key` header to `POST /agents` to auto-associate new agents, or to `POST /agents/claim` to claim existing agents programmatically.
+  - **Dashboard** — web UI to view claimed agents, claim new ones by pasting a secret key, and release agents.
+  - **Session auth** — cookie-based sessions for the dashboard (7-day expiry, automatic cleanup).
+  - New tables: `humans`, `human_agents`, `human_sessions`.
+
 - **MCP server at full parity with API** — Added 16 new MCP tools covering all documented API endpoints. Previously the MCP server only had 8 core tools; it now exposes 24 tools matching every REST endpoint:
   - **Agent management**: `caldave_get_agent`, `caldave_update_agent`
   - **SMTP configuration**: `caldave_set_smtp`, `caldave_get_smtp`, `caldave_delete_smtp`, `caldave_test_smtp`
@@ -48,7 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Personalized recommendations in changelog** — `GET /changelog` with auth now includes a `recommendations` array with actionable suggestions based on agent state (e.g. name your agent, create your first calendar, add a description).
 - **API changelog endpoint** — `GET /changelog` returns a structured list of API changes with dates and docs links. With optional Bearer auth, highlights changes introduced since the agent was created. Designed for agents to poll ~weekly.
 - **Agent metadata** — `POST /agents` now accepts optional `name` and `description` fields to identify agents. New `GET /agents/me` returns the agent's profile. New `PATCH /agents` updates metadata without changing the API key. Agent name and description are surfaced in `GET /man` context.
-- **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through the inbound webhook.
+- **Outbound calendar invites** — when an event is created or updated with attendees, CalDave sends METHOD:REQUEST iCal invite emails via Postmark. Invites include `.ics` attachments that work with Google Calendar, Outlook, and Apple Calendar. From address is the calendar's email so replies route back through inbound email.
 - **Agent name in outbound emails** — when an agent has a name set (via `PATCH /agents`), outbound invite and RSVP reply emails use `"Agent Name" <calendar-email>` as the From address, so recipients see a friendly display name instead of just the calendar email.
 - **Outbound RSVP replies** — when an agent responds to an inbound invite via `POST /respond`, CalDave sends a METHOD:REPLY iCal email back to the organiser with the agent's acceptance, decline, or tentative status.
 - **Graceful degradation** — if `POSTMARK_SERVER_TOKEN` is not set, outbound emails are silently skipped. All API endpoints continue to work normally.
@@ -111,8 +118,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Uses `rrule` npm package for RRULE parsing and expansion
 - **API documentation page** (`GET /docs`) — self-contained HTML docs with curl examples for every endpoint, copy buttons, quick start guide, and dark theme matching the status page
 - Full API spec in `CALDAVE_SPEC.md`
-- **Inbound email support** — receive calendar invites via per-calendar webhook URLs
-  - `POST /inbound/:token` — unique webhook URL per calendar (token in URL authenticates)
+- **Inbound email support** — receive calendar invites via per-calendar inbound URLs
+  - `POST /inbound/:token` — unique inbound URL per calendar (token in URL authenticates)
   - Each calendar gets an `inbound_webhook_url` returned at creation and in GET responses
   - Parses `.ics` attachments from inbound emails using `node-ical`
   - Creates events with `source: inbound_email`, `status: tentative`
@@ -134,7 +141,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Rate limiting** — replaced stub headers with real enforcement via `express-rate-limit` (200/min API, 5/hour agent creation, 60/min inbound webhooks)
 - **Security headers** — added `helmet` middleware (X-Content-Type-Options, X-Frame-Options, HSTS, CSP, etc.)
 - **Request body size limit** — explicit 512KB limit on `express.json()` to prevent oversized payloads
-- **Inbound webhook token hardening** — invalid tokens now return 200 (not 404) to prevent token validity enumeration
+- **Inbound token hardening** — invalid tokens now return 200 (not 404) to prevent token validity enumeration
 - **RRULE frequency restriction** — reject `FREQ=SECONDLY` and `FREQ=MINUTELY` (expansion blocks event loop for 18s+)
 - **init-db.sh SQL quoting** — `CREATE DATABASE` now uses quoted identifier to prevent SQL injection via `DB_NAME`
 - **Input validation** — length limits on calendar name (255), timezone (64), event title (500), location (500); webhook URL format validation
@@ -151,7 +158,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Schema uses `CREATE TABLE IF NOT EXISTS` — no migration tool needed for v1
 - nanoid (v5) used for all ID generation with alphanumeric alphabet
 - API keys use SHA-256 (not bcrypt) for deterministic lookup by hash
-- Webhook columns exist in schema but webhook delivery is deferred
+- Webhook delivery fires on all event mutations (event.created, event.updated, event.deleted, event.responded)
 - Port 3720 generated from `get-port.sh caldave`
 
 ---

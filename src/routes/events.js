@@ -24,6 +24,7 @@ const {
   MATERIALIZE_WINDOW_DAYS,
 } = require('../lib/recurrence');
 const { sendInviteEmail, sendReplyEmail, parseAttendees } = require('../lib/outbound');
+const { fireWebhook } = require('../lib/webhooks');
 
 const router = Router();
 
@@ -435,6 +436,7 @@ router.post('/:id/events', async (req, res) => {
       response.email_sent = inviteResult.sent;
     }
     res.status(201).json(response);
+    fireWebhook(req.params.id, 'event.created', response);
   } catch (err) {
     logError(err, { route: 'POST /calendars/:id/events', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to create event' });
@@ -824,6 +826,7 @@ router.patch('/:id/events/:event_id', async (req, res) => {
     }
 
     res.json(standaloneResponse);
+    fireWebhook(req.params.id, 'event.updated', standaloneResponse);
   } catch (err) {
     logError(err, { route: 'PATCH /calendars/:id/events/:event_id', method: 'PATCH', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to update event' });
@@ -860,6 +863,7 @@ router.delete('/:id/events/:event_id', async (req, res) => {
     // ---- Standalone event: just delete it ----
     if (!evt.parent_event_id && !evt.recurrence) {
       await pool.query('DELETE FROM events WHERE id = $1', [evt.id]);
+      fireWebhook(req.params.id, 'event.deleted', { id: evt.id });
       return res.status(204).end();
     }
 
@@ -872,6 +876,7 @@ router.delete('/:id/events/:event_id', async (req, res) => {
       }
       // CASCADE deletes all instances
       await pool.query('DELETE FROM events WHERE id = $1', [evt.id]);
+      fireWebhook(req.params.id, 'event.deleted', { id: evt.id });
       return res.status(204).end();
     }
 
@@ -882,6 +887,7 @@ router.delete('/:id/events/:event_id', async (req, res) => {
         "UPDATE events SET status = 'cancelled', is_exception = true, updated_at = now() WHERE id = $1",
         [evt.id]
       );
+      fireWebhook(req.params.id, 'event.deleted', { id: evt.id });
       return res.status(204).end();
 
     } else if (mode === 'future') {
@@ -925,11 +931,13 @@ router.delete('/:id/events/:event_id', async (req, res) => {
         );
       }
 
+      fireWebhook(req.params.id, 'event.deleted', { id: evt.id });
       return res.status(204).end();
 
     } else if (mode === 'all') {
       // Delete the parent — CASCADE handles instances
       await pool.query('DELETE FROM events WHERE id = $1', [evt.parent_event_id]);
+      fireWebhook(req.params.id, 'event.deleted', { id: evt.parent_event_id });
       return res.status(204).end();
 
     } else {
@@ -1004,12 +1012,14 @@ router.post('/:id/events/:event_id/respond', async (req, res) => {
       console.log('[outbound] Skipping duplicate reply: event=%s response=%s (already sent)', updatedEvent.id, response);
     }
 
-    res.json({
+    const respondResult = {
       ...formatEvent(updatedEvent),
       response,
       message: `Event ${response}`,
       email_sent: emailSent,
-    });
+    };
+    res.json(respondResult);
+    fireWebhook(req.params.id, 'event.responded', respondResult);
   } catch (err) {
     logError(err, { route: 'POST /calendars/:id/events/:event_id/respond', method: 'POST', agent_id: req.agent?.id });
     res.status(500).json({ error: 'Failed to respond to event' });

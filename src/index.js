@@ -18,9 +18,10 @@
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const { pool, initSchema } = require('./db');
 const auth = require('./middleware/auth');
-const { apiLimiter, agentCreationLimiter, inboundLimiter } = require('./middleware/rateLimit');
+const { apiLimiter, agentCreationLimiter, inboundLimiter, humanAuthLimiter } = require('./middleware/rateLimit');
 const agentsRouter = require('./routes/agents');
 const calendarsRouter = require('./routes/calendars');
 const eventsRouter = require('./routes/events');
@@ -33,6 +34,7 @@ const viewRouter = require('./routes/view');
 const postmarkWebhooksRouter = require('./routes/postmark-webhooks');
 const legalRouter = require('./routes/legal');
 const changelogRouter = require('./routes/changelog');
+const humansRouter = require('./routes/humans');
 const { extendAllHorizons, EXTEND_INTERVAL_MS } = require('./lib/recurrence');
 
 const app = express();
@@ -52,7 +54,9 @@ app.use(helmet({
     },
   },
 }));
+app.use(cookieParser());
 app.use(express.json({ limit: '512kb' }));
+app.use(express.urlencoded({ extended: false }));
 app.use(apiLimiter);
 
 // ---------------------------------------------------------------------------
@@ -179,6 +183,10 @@ app.use('/', legalRouter);
 app.use('/man', manRouter);
 // API changelog (optional auth handled internally)
 app.use('/changelog', changelogRouter);
+// Human accounts (signup, login, dashboard — rate-limited)
+app.post('/signup', humanAuthLimiter);
+app.post('/login', humanAuthLimiter);
+app.use('/', humansRouter);
 // Agent provisioning (POST rate-limited, GET/PATCH use general API limiter)
 app.post('/agents', agentCreationLimiter);
 app.use('/agents', agentsRouter);
@@ -307,6 +315,13 @@ async function start() {
       console.error('Horizon extension error:', err.message);
     });
   }, EXTEND_INTERVAL_MS);
+
+  // Clean up expired human sessions every hour
+  setInterval(() => {
+    pool.query('DELETE FROM human_sessions WHERE expires_at < now()').catch(err => {
+      console.error('Session cleanup error:', err.message);
+    });
+  }, 60 * 60 * 1000);
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`CalDave running on port ${port}`);

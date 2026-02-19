@@ -22,5 +22,9 @@ const eventId = () => `evt_${shortId()}`;
 const feedToken = () => `feed_${longId()}`;
 const inboundToken = () => `inb_${longId()}`;
 const apiKey = () => `sk_live_${longId()}`;
+const humanId = () => `hum_${shortId()}`;
+const humanAgentId = () => `ha_${shortId()}`;
+const sessionToken = () => `sess_${longId()}`;
+const humanApiKey = () => `hk_live_${longId()}`;
 
-module.exports = { agentId, calendarId, eventId, feedToken, inboundToken, apiKey };
+module.exports = { agentId, calendarId, eventId, feedToken, inboundToken, apiKey, humanId, humanAgentId, sessionToken, humanApiKey };

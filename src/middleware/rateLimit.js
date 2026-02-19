@@ -51,4 +51,17 @@ const inboundLimiter = rateLimit({
   message: { error: 'Too many requests' },
 });
 
-module.exports = { apiLimiter, agentCreationLimiter, inboundLimiter };
+/**
+ * Human auth limiter (login/signup).
+ * 10 requests per 15 minutes per IP.
+ */
+const humanAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skip: skipInTest,
+  message: { error: 'Too many login/signup attempts, please try again later' },
+});
+
+module.exports = { apiLimiter, agentCreationLimiter, inboundLimiter, humanAuthLimiter };

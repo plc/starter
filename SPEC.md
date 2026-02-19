@@ -27,7 +27,16 @@ fly deploy
 | `GET /` | No | Status page |
 | `GET /health` | No | Server health check |
 | `GET /health/db` | No | Database health check |
-| `POST /agents` | No | Create agent (returns API key) |
+| `POST /agents` | No (optional `X-Human-Key`) | Create agent (returns API key). With human key, auto-claims. |
+| `POST /agents/claim` | `X-Human-Key` | Claim an existing agent by providing its `sk_live_` key |
+| `GET /signup` | No | Human account signup page |
+| `POST /signup` | No | Create human account |
+| `GET /login` | No | Human account login page |
+| `POST /login` | No | Authenticate human |
+| `POST /logout` | Cookie | Log out (clear session) |
+| `GET /dashboard` | Cookie | Dashboard — manage claimed agents |
+| `POST /dashboard/claim` | Cookie | Claim agent via dashboard |
+| `POST /dashboard/agents/:id/release` | Cookie | Release agent ownership |
 | `GET /man` | Optional | Machine-readable API manual (JSON), personalized if authenticated |
 | `POST /calendars` | Yes | Create calendar |
 | `GET /calendars` | Yes | List agent's calendars |
@@ -61,10 +70,14 @@ src/
 │   ├── outbound.js       — Outbound email (iCal invite/reply generation, Postmark sending)
 │   └── recurrence.js     — RRULE parsing, materialization, horizon management
 ├── middleware/
-│   ├── auth.js           — Bearer token auth
-│   └── rateLimitStub.js  — Stub rate limit headers
+│   ├── auth.js           — Bearer token auth (agents)
+│   ├── humanAuth.js      — Session cookie + X-Human-Key auth (humans)
+│   └── rateLimit.js      — Rate limiting (express-rate-limit)
+├── lib/
+│   ├── passwords.js      — bcryptjs password hashing
 └── routes/
-    ├── agents.js         — POST /agents
+    ├── agents.js         — POST /agents, POST /agents/claim
+    ├── humans.js         — Signup, login, dashboard, claim, release
     ├── man.js            — GET /man (machine-readable API manual)
     ├── calendars.js      — Calendar CRUD
     ├── events.js         — Event CRUD + upcoming + respond
@@ -78,7 +91,7 @@ scripts/
 
 ## Database Schema
 
-Five tables: `agents`, `calendars`, `events`, `postmark_webhooks`, `error_log`. Schema auto-created on startup.
+Eight tables: `agents`, `calendars`, `events`, `postmark_webhooks`, `error_log`, `humans`, `human_agents`, `human_sessions`. Schema auto-created on startup.
 
 See `CALDAVE_SPEC.md` for full column definitions.
 
@@ -117,14 +130,14 @@ Events can be created with `all_day: true`. When set:
 
 ## Auth Model
 
-- API keys: `sk_live_` prefix + 32 alphanumeric chars
-- Stored as SHA-256 hash (direct DB lookup, no iteration)
+- **Agent API keys**: `sk_live_` prefix + 32 alphanumeric chars, SHA-256 hashed
+- **Human API keys**: `hk_live_` prefix + 32 alphanumeric chars, SHA-256 hashed
+- **Human sessions**: `sess_` prefix + 32 chars, cookie-based (7-day expiry)
+- **Human passwords**: bcryptjs with 12 salt rounds
 - Agent scoping: each agent only sees their own calendars/events
+- Human-agent ownership: humans claim agents by providing the agent's secret key
 
 ## Deferred
 
 - DST-aware recurrence (times currently repeat at same UTC offset, may drift ±1h across DST)
 - iCal feed with RRULE + EXDATE (currently emits individual VEVENTs)
-- Webhooks / push notifications (pg-boss)
-- MCP tools
-- Real rate limiting (headers are stubbed)

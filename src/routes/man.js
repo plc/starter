@@ -88,8 +88,8 @@ function getEndpoints() {
       topic: 'agents',
       method: 'POST',
       path: '/agents',
-      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Include name and description — the name appears in outbound email From headers.',
-      auth: 'none',
+      description: 'Create a new agent identity. Returns agent_id and api_key (shown once — save it). Include name and description — the name appears in outbound email From headers. Pass X-Human-Key header to auto-associate with a human account.',
+      auth: 'none (optional X-Human-Key header)',
       parameters: [
         { name: 'name', in: 'body', required: false, type: 'string', description: 'Display name for the agent (max 255 chars). Recommended.' },
         { name: 'description', in: 'body', required: false, type: 'string', description: 'What this agent does (max 1024 chars). Recommended.' },
@@ -101,6 +101,23 @@ function getEndpoints() {
         name: 'My Agent',
         description: 'Manages team meetings and sends daily summaries',
         message: 'Store these credentials securely. The API key will not be shown again.',
+      },
+    },
+    {
+      topic: 'agents',
+      method: 'POST',
+      path: '/agents/claim',
+      description: 'Claim an existing agent by providing its API key. The agent is immediately associated with your human account.',
+      auth: 'X-Human-Key header',
+      parameters: [
+        { name: 'api_key', in: 'body', required: true, type: 'string', description: 'The agent API key to claim (sk_live_...).' },
+      ],
+      example_body: { api_key: 'sk_live_abc123...' },
+      example_response: {
+        agent_id: 'agt_x7y8z9AbCd',
+        agent_name: 'My Agent',
+        claimed: true,
+        owned_by: 'hum_abc123...',
       },
     },
     {
@@ -224,7 +241,7 @@ function getEndpoints() {
         { name: 'agentmail_api_key', in: 'body', required: false, type: 'string', description: 'AgentMail API key for inbound email attachments' },
         { name: 'webhook_url', in: 'body', required: false, type: 'string', description: 'URL to receive event webhooks' },
         { name: 'webhook_secret', in: 'body', required: false, type: 'string', description: 'Secret for HMAC-SHA256 webhook signatures' },
-        { name: 'webhook_offsets', in: 'body', required: false, type: 'array', description: 'Offsets in seconds for pre-event webhook reminders (e.g. [300, 900])' },
+        { name: 'webhook_offsets', in: 'body', required: false, type: 'array', description: 'Reserved for future pre-event reminders. Stored but not yet acted on.' },
         { name: 'welcome_event', in: 'body', required: false, type: 'boolean', description: 'Set to false to skip the auto-created welcome event (recommended for production). Defaults to true.' },
       ],
       example_body: { name: 'Work Schedule', timezone: 'America/Denver' },
@@ -271,7 +288,7 @@ function getEndpoints() {
         { name: 'timezone', in: 'body', required: false, type: 'string', description: 'IANA timezone' },
         { name: 'webhook_url', in: 'body', required: false, type: 'string', description: 'URL to receive event notifications' },
         { name: 'webhook_secret', in: 'body', required: false, type: 'string', description: 'HMAC secret for webhook signatures' },
-        { name: 'webhook_offsets', in: 'body', required: false, type: 'array', description: 'Reminder offsets, e.g. ["-5m", "-1m"]' },
+        { name: 'webhook_offsets', in: 'body', required: false, type: 'array', description: 'Reserved for future pre-event reminders. Stored but not yet acted on.' },
         { name: 'agentmail_api_key', in: 'body', required: false, type: 'string', description: 'AgentMail API key' },
       ],
       example_body: { name: 'Updated Name', timezone: 'America/New_York' },
@@ -305,7 +322,7 @@ function getEndpoints() {
       topic: 'events',
       method: 'POST',
       path: '/calendars/:id/events',
-      description: 'Create an event. Supports one-off and recurring (RRULE) events.',
+      description: 'Create an event. Supports one-off and recurring (RRULE) events. Fires event.created webhook if calendar has webhook_url.',
       auth: 'bearer',
       parameters: [
         { name: 'id', in: 'path', required: true, type: 'string', description: 'Calendar ID' },
@@ -357,7 +374,7 @@ function getEndpoints() {
       topic: 'events',
       method: 'PATCH',
       path: '/calendars/:id/events/:event_id',
-      description: 'Update an event. Patching a recurring instance marks it as an exception; patching the parent propagates to non-exception instances.',
+      description: 'Update an event. Patching a recurring instance marks it as an exception; patching the parent propagates to non-exception instances. Fires event.updated webhook.',
       auth: 'bearer',
       parameters: [
         { name: 'id', in: 'path', required: true, type: 'string', description: 'Calendar ID' },
@@ -380,7 +397,7 @@ function getEndpoints() {
       topic: 'events',
       method: 'DELETE',
       path: '/calendars/:id/events/:event_id',
-      description: 'Delete an event. For recurring instances, use the mode query parameter.',
+      description: 'Delete an event. For recurring instances, use the mode query parameter. Fires event.deleted webhook.',
       auth: 'bearer',
       parameters: [
         { name: 'id', in: 'path', required: true, type: 'string', description: 'Calendar ID' },
@@ -420,7 +437,7 @@ function getEndpoints() {
       topic: 'events',
       method: 'POST',
       path: '/calendars/:id/events/:event_id/respond',
-      description: 'Accept or decline an inbound calendar invite.',
+      description: 'Accept or decline an inbound calendar invite. Fires event.responded webhook.',
       auth: 'bearer',
       parameters: [
         { name: 'id', in: 'path', required: true, type: 'string', description: 'Calendar ID' },
@@ -447,7 +464,7 @@ function getEndpoints() {
       topic: 'feeds',
       method: 'POST',
       path: '/inbound/:token',
-      description: 'Inbound email webhook. Receives forwarded .ics invites. Each calendar has a unique webhook URL returned at creation. Supports Postmark and AgentMail.',
+      description: 'Inbound email endpoint. Receives forwarded .ics invites and creates calendar events from them. Each calendar has a unique inbound URL returned at creation. Supports Postmark and AgentMail.',
       auth: 'url_token',
       parameters: [
         { name: 'token', in: 'path', required: true, type: 'string', description: 'Inbound token (inb_...)' },
@@ -542,6 +559,16 @@ function buildRecommendation(context, apiKey, calId) {
     };
   }
 
+  if (!context.claimed) {
+    return {
+      action: 'Claim this agent with a human account',
+      description: 'This agent has calendars and events but isn\'t claimed by a human account. Claiming lets you manage API keys from a dashboard and prevents losing access.',
+      endpoint: 'POST /agents/claim',
+      curl: 'curl -s -X POST "' + BASE + '/agents/claim" -H "Content-Type: application/json" -H "X-Human-Key: hk_live_YOUR_HUMAN_KEY" -d \'{"api_key": "sk_live_YOUR_AGENT_KEY"}\'',
+      signup_url: BASE + '/signup',
+    };
+  }
+
   const withEvents = context.calendars.find(c => c.event_count > 1) || context.calendars[0];
   return {
     action: 'Check upcoming events',
@@ -567,6 +594,7 @@ router.get('/', softAuth, async (req, res) => {
       agent_name: null,
       agent_description: null,
       calendars: [],
+      claimed: false,
     };
 
     let calId = null;
@@ -600,6 +628,13 @@ router.get('/', softAuth, async (req, res) => {
       if (context.calendars.length > 0) {
         calId = context.calendars[0].id;
       }
+
+      // Check if agent is claimed by a human account
+      const { rows: claimed } = await pool.query(
+        'SELECT 1 FROM human_agents WHERE agent_id = $1 LIMIT 1',
+        [req.agent.id]
+      );
+      context.claimed = claimed.length > 0;
     }
 
     const recommendation = buildRecommendation(context, apiKey, calId);

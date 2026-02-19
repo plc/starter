@@ -156,6 +156,41 @@ async function initSchema() {
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_pass text;
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_from text;
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS smtp_secure boolean;
+
+    -- Human accounts for managing agent keys
+    CREATE TABLE IF NOT EXISTS humans (
+      id              text PRIMARY KEY,
+      name            text NOT NULL,
+      email           text NOT NULL UNIQUE,
+      password_hash   text NOT NULL,
+      api_key_hash    text NOT NULL,
+      created_at      timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_humans_email_lower ON humans (LOWER(email));
+    CREATE INDEX IF NOT EXISTS idx_humans_api_key_hash ON humans (api_key_hash);
+
+    -- Human-agent ownership associations
+    CREATE TABLE IF NOT EXISTS human_agents (
+      id          text PRIMARY KEY,
+      human_id    text NOT NULL REFERENCES humans(id) ON DELETE CASCADE,
+      agent_id    text NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      claimed_at  timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(human_id, agent_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_human_agents_human ON human_agents (human_id);
+    CREATE INDEX IF NOT EXISTS idx_human_agents_agent ON human_agents (agent_id);
+
+    -- Cookie-based sessions for the dashboard
+    CREATE TABLE IF NOT EXISTS human_sessions (
+      id          text PRIMARY KEY,
+      human_id    text NOT NULL REFERENCES humans(id) ON DELETE CASCADE,
+      expires_at  timestamptz NOT NULL,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_human_sessions_human ON human_sessions (human_id);
   `);
 
   // Backfill inbound_token for existing calendars that don't have one

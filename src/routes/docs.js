@@ -82,6 +82,11 @@ const cachedHtml = `<!DOCTYPE html>
 
     <div class="toc">
       <h2>Endpoints</h2>
+      <div class="section">Human Accounts</div>
+      <ul>
+        <li><a href="#human-accounts">Overview</a> — Sign up, log in, manage agent keys</li>
+        <li><a href="#post-agents-claim">POST /agents/claim</a> — Claim agent via API</li>
+      </ul>
       <div class="section">Agents</div>
       <ul>
         <li><a href="#post-agents">POST /agents</a> — Create agent</li>
@@ -112,11 +117,15 @@ const cachedHtml = `<!DOCTYPE html>
         <li><a href="#get-view">GET /calendars/:id/view</a> — Plain text calendar view</li>
         <li><a href="#post-respond">POST /calendars/:id/events/:eid/respond</a> — Respond to invite</li>
       </ul>
-      <div class="section">Feeds &amp; Webhooks</div>
+      <div class="section">Feeds &amp; Inbound Email</div>
       <ul>
         <li><a href="#get-feed">GET /feeds/:id.ics</a> — iCal feed</li>
-        <li><a href="#post-inbound">POST /inbound/:token</a> — Inbound email webhook</li>
+        <li><a href="#post-inbound">POST /inbound/:token</a> — Receive calendar invites via email</li>
+      </ul>
+      <div class="section">Event Webhooks</div>
+      <ul>
         <li><a href="#webhook-verification">Webhook Verification</a> — Signature verification</li>
+        <li><a href="#webhook-events">Webhook Events</a> — Event types delivered to your webhook_url</li>
       </ul>
       <div class="section">Debugging</div>
       <ul>
@@ -162,9 +171,39 @@ const cachedHtml = `<!DOCTYPE html>
     <div class="params" style="margin-bottom:1.5rem;">
       <div class="param"><span class="param-name" style="min-width:200px;">API endpoints</span><span class="param-desc">1000 requests / minute per IP</span></div>
       <div class="param"><span class="param-name" style="min-width:200px;">POST /agents</span><span class="param-desc">20 requests / hour per IP</span></div>
+      <div class="param"><span class="param-name" style="min-width:200px;">Login / Signup</span><span class="param-desc">10 requests / 15 min per IP</span></div>
       <div class="param"><span class="param-name" style="min-width:200px;">Inbound webhooks</span><span class="param-desc">60 requests / minute per IP</span></div>
     </div>
     <p style="font-size:0.8125rem; color:#64748b;">Responses include <code class="inline-code">RateLimit-Limit</code>, <code class="inline-code">RateLimit-Remaining</code>, and <code class="inline-code">RateLimit-Reset</code> headers (RFC draft-7). When exceeded, you receive a 429 response.</p>
+
+    <!-- ============================================================ -->
+    <h2 id="human-accounts">Human Accounts</h2>
+
+    <div class="note">
+      Human accounts let you manage your agent keys from a central dashboard. Sign up at <a href="/signup" style="color:#60a5fa">/signup</a>, then claim agents by providing their secret key. You can also pass the <code class="inline-code">X-Human-Key</code> header on <code class="inline-code">POST /agents</code> or <code class="inline-code">POST /agents/claim</code> for programmatic access.
+    </div>
+
+    <div class="endpoint" id="post-agents-claim">
+      <div class="method-path">
+        <span class="method post">POST</span>
+        <span class="path">/agents/claim</span>
+        <span class="auth-badge required">X-Human-Key</span>
+      </div>
+      <p class="desc">Claim an existing agent by providing its API key. The agent is immediately associated with your human account.</p>
+      <div class="label">Headers</div>
+      <div class="params">
+        <div class="param"><span class="param-name">X-Human-Key <span class="param-req">required</span></span><span class="param-desc">Your human API key (<code class="inline-code">hk_live_...</code>)</span></div>
+      </div>
+      <div class="label">Body parameters</div>
+      <div class="params">
+        <div class="param"><span class="param-name">api_key <span class="param-req">required</span></span><span class="param-desc">The agent API key to claim (<code class="inline-code">sk_live_...</code>)</span></div>
+      </div>
+      <div class="label">Example</div>
+      <pre><code>curl -s -X POST "https://${DOMAIN}/agents/claim" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Human-Key: hk_live_YOUR_HUMAN_KEY" \\
+  -d '{"api_key": "sk_live_AGENT_KEY_TO_CLAIM"}'</code></pre>
+    </div>
 
     <!-- ============================================================ -->
     <h2 id="agents">Agents</h2>
@@ -173,9 +212,13 @@ const cachedHtml = `<!DOCTYPE html>
       <div class="method-path">
         <span class="method post">POST</span>
         <span class="path">/agents</span>
-        <span class="auth-badge">No auth</span>
+        <span class="auth-badge">No auth required</span>
       </div>
       <p class="desc">Create a new agent identity. Returns credentials you must save — the API key is shown once. Include <code class="inline-code">name</code> and <code class="inline-code">description</code> to identify your agent — the name appears in outbound email From headers.</p>
+      <div class="label">Headers</div>
+      <div class="params">
+        <div class="param"><span class="param-name">X-Human-Key <span class="param-opt">optional</span></span><span class="param-desc">Your human API key (<code class="inline-code">hk_live_...</code>). When provided, the new agent is automatically associated with your human account.</span></div>
+      </div>
       <div class="label">Body parameters</div>
       <div class="params">
         <div class="param"><span class="param-name">name <span class="param-rec">recommended</span></span><span class="param-desc">Display name for the agent (max 255 chars). Appears in outbound email From headers (e.g. "My Agent" &lt;cal-xxx@${EMAIL_DOMAIN}&gt;).</span></div>
@@ -185,14 +228,21 @@ const cachedHtml = `<!DOCTYPE html>
       <pre><code>curl -s -X POST "https://${DOMAIN}/agents" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "Meeting Scheduler", "description": "Books rooms and sends reminders"}'</code></pre>
+      <div class="label">With human key (auto-associate)</div>
+      <pre><code>curl -s -X POST "https://${DOMAIN}/agents" \\
+  -H "Content-Type: application/json" \\
+  -H "X-Human-Key: hk_live_YOUR_HUMAN_KEY" \\
+  -d '{"name": "Meeting Scheduler"}'</code></pre>
       <div class="label">Response</div>
       <pre><code>{
   "agent_id": "agt_x7y8z9AbCd",
   "api_key": "sk_live_abc123...",
   "name": "Meeting Scheduler",
   "description": "Books rooms and sends reminders",
+  "owned_by": "hum_abc123...",
   "message": "Store these credentials securely. The API key will not be shown again."
 }</code></pre>
+      <div class="note">The <code class="inline-code">owned_by</code> field only appears when <code class="inline-code">X-Human-Key</code> is provided. Without it, the agent is created unclaimed.</div>
     </div>
 
     <div class="endpoint" id="get-agents-me">
@@ -343,7 +393,7 @@ const cachedHtml = `<!DOCTYPE html>
         <div class="param"><span class="param-name">agentmail_api_key <span class="param-opt">optional</span></span><span class="param-desc">AgentMail API key for fetching inbound email attachments</span></div>
         <div class="param"><span class="param-name">webhook_url <span class="param-opt">optional</span></span><span class="param-desc">URL to receive event webhooks (must be a valid URL)</span></div>
         <div class="param"><span class="param-name">webhook_secret <span class="param-opt">optional</span></span><span class="param-desc">Secret for HMAC-SHA256 webhook signatures (sent in <code class="inline-code">X-CalDave-Signature</code> header)</span></div>
-        <div class="param"><span class="param-name">webhook_offsets <span class="param-opt">optional</span></span><span class="param-desc">Array of offsets in seconds for pre-event webhook reminders (e.g. <code class="inline-code">[300, 900]</code> for 5min and 15min before)</span></div>
+        <div class="param"><span class="param-name">webhook_offsets <span class="param-opt">optional</span></span><span class="param-desc">Reserved for future pre-event reminders. Stored but not yet acted on.</span></div>
         <div class="param"><span class="param-name">welcome_event <span class="param-opt">optional</span></span><span class="param-desc">Set to <code class="inline-code">false</code> to skip the auto-created welcome event (recommended for production agents). Defaults to true.</span></div>
       </div>
       <div class="label">Example</div>
@@ -401,7 +451,7 @@ const cachedHtml = `<!DOCTYPE html>
         <div class="param"><span class="param-name">timezone</span><span class="param-desc">IANA timezone</span></div>
         <div class="param"><span class="param-name">webhook_url</span><span class="param-desc">URL to receive event notifications</span></div>
         <div class="param"><span class="param-name">webhook_secret</span><span class="param-desc">HMAC secret for webhook signatures</span></div>
-        <div class="param"><span class="param-name">webhook_offsets</span><span class="param-desc">Array of offsets, e.g. ["-5m", "-1m"]</span></div>
+        <div class="param"><span class="param-name">webhook_offsets</span><span class="param-desc">Reserved for future pre-event reminders</span></div>
         <div class="param"><span class="param-name">agentmail_api_key</span><span class="param-desc">AgentMail API key for this calendar</span></div>
       </div>
       <div class="label">Example</div>
@@ -441,6 +491,14 @@ const cachedHtml = `<!DOCTYPE html>
   "message": "Webhook delivered successfully."
 }</code></pre>
       <div class="note">The test payload includes <code class="inline-code">type: "test"</code> so your webhook handler can distinguish test pings from real events. If <code class="inline-code">webhook_secret</code> is set, the payload is signed with HMAC-SHA256 via the <code class="inline-code">X-CalDave-Signature</code> header.</div>
+    </div>
+
+    <!-- ============================================================ -->
+    <h2 id="event-webhooks">Event Webhooks</h2>
+
+    <div class="note">
+      Event webhooks notify your server when calendar events change. This is <strong>separate from inbound email</strong> (which <em>creates</em> events from forwarded .ics invites).<br><br>
+      <strong>To enable:</strong> Set <code class="inline-code">webhook_url</code> on a calendar via <code class="inline-code">POST /calendars</code> or <code class="inline-code">PATCH /calendars/:id</code>. Optionally set <code class="inline-code">webhook_secret</code> for HMAC-SHA256 signature verification. Use <code class="inline-code">POST /calendars/:id/webhook/test</code> to verify your endpoint is reachable.
     </div>
 
     <!-- ============================================================ -->
@@ -487,6 +545,29 @@ if not hmac.compare_digest(expected, signature):
     abort(401)</code></pre>
 
     <div class="note">Always verify against the <strong>raw request body</strong> (the exact bytes received), not re-serialized JSON. Use constant-time comparison (<code class="inline-code">timingSafeEqual</code> / <code class="inline-code">compare_digest</code>) to prevent timing attacks. If no <code class="inline-code">webhook_secret</code> is set, the header is omitted and payloads are unsigned.</div>
+
+    <!-- ============================================================ -->
+    <h3 id="webhook-events">Webhook Events</h3>
+    <p>When a calendar has a <code class="inline-code">webhook_url</code> configured, CalDave automatically delivers webhooks whenever events are created, updated, deleted, or responded to &mdash; whether via the API or inbound email.</p>
+
+    <div class="label">Event Types</div>
+    <div class="params">
+      <div class="param"><span class="param-name">event.created</span><span class="param-desc">A new event was added (API or inbound email)</span></div>
+      <div class="param"><span class="param-name">event.updated</span><span class="param-desc">An event was modified (API PATCH or inbound email update)</span></div>
+      <div class="param"><span class="param-name">event.deleted</span><span class="param-desc">An event was deleted or cancelled (API DELETE or inbound email CANCEL)</span></div>
+      <div class="param"><span class="param-name">event.responded</span><span class="param-desc">An event was accepted, declined, or marked tentative</span></div>
+    </div>
+
+    <div class="label">Payload Shape</div>
+    <pre><code>{
+  "type": "event.created",
+  "calendar_id": "cal_...",
+  "event_id": "evt_...",
+  "event": { ... },
+  "timestamp": "2026-02-17T12:00:00.000Z"
+}</code></pre>
+
+    <div class="note">Webhooks are fire-and-forget. Delivery is not retried on failure. Use <code class="inline-code">POST /calendars/:id/webhook/test</code> to verify your endpoint is reachable before relying on live events.</div>
 
     <!-- ============================================================ -->
     <h2 id="events">Events</h2>
@@ -701,7 +782,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
     </div>
 
     <!-- ============================================================ -->
-    <h2 id="inbound">Inbound Email Webhook</h2>
+    <h2 id="inbound">Inbound Email</h2>
 
     <div class="endpoint" id="post-inbound">
       <div class="method-path">
@@ -709,7 +790,7 @@ Daily standup  2026-02-13 16:00:00Z  ...
         <span class="path">/inbound/:token</span>
         <span class="auth-badge">Token in URL</span>
       </div>
-      <p class="desc">Receives forwarded emails containing .ics calendar invite attachments. Each calendar has a unique webhook URL (returned at creation as <code class="inline-code">inbound_webhook_url</code>). Supports Postmark and AgentMail providers.</p>
+      <p class="desc">Receives forwarded emails containing .ics calendar invite attachments and creates events from them. Each calendar has a unique inbound URL (returned at creation as <code class="inline-code">inbound_webhook_url</code>). Supports Postmark and AgentMail providers.</p>
       <div class="label">How it works</div>
       <div class="params">
         <div class="param"><span class="param-name">REQUEST / PUBLISH</span><span class="param-desc">Creates a new event (or updates if ical_uid matches). Status set to tentative.</span></div>

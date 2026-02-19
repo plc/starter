@@ -69,7 +69,7 @@ Agents need to know when it's time to act. Two mechanisms:
 
 **Polling (primary):** Agents call `GET /calendars/:id/upcoming` to check what's next. Simple, stateless, works with any agent framework.
 
-**Webhooks (optional, per-calendar):** A calendar can register a webhook URL. CalDave sends a POST to that URL at configurable offsets before an event starts (e.g. 5 minutes before). Webhook delivery uses a simple retry policy (3 attempts, exponential backoff).
+**Webhooks (optional, per-calendar):** A calendar can register a webhook URL. CalDave sends a POST to that URL whenever events are created, updated, deleted, or responded to — whether via the API or inbound email. Payloads are signed with HMAC-SHA256 if a `webhook_secret` is set. Delivery is fire-and-forget.
 
 ---
 
@@ -77,8 +77,11 @@ Agents need to know when it's time to act. Two mechanisms:
 
 | Concept | Details |
 |---------|---------|
-| **API Key** | Bearer token, one per agent. Sent as `Authorization: Bearer <key>` |
+| **Agent API Key** | Bearer token, one per agent. Sent as `Authorization: Bearer sk_live_...` |
+| **Human API Key** | One per human account. Passed as `X-Human-Key` header for claiming agents. |
 | **Provisioning** | `POST /agents` returns `agent_id` + `api_key`. Agent must store these — the key is shown once. |
+| **Human Accounts** | Humans sign up at `/signup` to get a dashboard and human API key (`hk_live_...`). |
+| **Agent Claiming** | Humans claim agents by providing the agent's `sk_live_` key — via dashboard or `POST /agents/claim` with `human_key`. |
 | **Scoping** | An API key grants access to all calendars owned by that agent. No cross-agent access. |
 
 ---
@@ -88,7 +91,12 @@ Agents need to know when it's time to act. Two mechanisms:
 ### Agent Provisioning
 
 #### `POST /agents`
-Creates a new agent identity. No auth required. Optionally accepts `name` and `description` to identify the agent.
+Creates a new agent identity. No auth required. Optionally accepts `name` and `description` to identify the agent. Pass the `X-Human-Key` header to associate with a human account.
+
+**Headers (optional):**
+| Header | Description |
+|--------|-------------|
+| `X-Human-Key` | Human API key (`hk_live_...`) to auto-associate the new agent |
 
 **Request (optional):**
 ```json
@@ -105,7 +113,35 @@ Creates a new agent identity. No auth required. Optionally accepts `name` and `d
   "api_key": "sk_live_abc123...",
   "name": "My Assistant",
   "description": "Manages team calendars and sends meeting reminders",
-  "message": "Store these credentials securely. The API key will not be shown again."
+  "message": "Store these credentials securely. The API key will not be shown again.",
+  "owned_by": "hum_abc123..."
+}
+```
+
+The `owned_by` field only appears when `X-Human-Key` header is provided.
+
+#### `POST /agents/claim`
+Claim an existing agent by providing its API key. Requires `X-Human-Key` header.
+
+**Headers:**
+| Header | Description |
+|--------|-------------|
+| `X-Human-Key` | **Required.** Human API key (`hk_live_...`) |
+
+**Request:**
+```json
+{
+  "api_key": "sk_live_abc123..."
+}
+```
+
+**Response:**
+```json
+{
+  "agent_id": "agt_x7y8z9",
+  "agent_name": "My Assistant",
+  "claimed": true,
+  "owned_by": "hum_abc123..."
 }
 ```
 
@@ -444,26 +480,29 @@ Set or update webhook configuration:
 }
 ```
 
-**Webhook payload (POST to the registered URL):**
+#### Webhook Event Types
+
+When a calendar has a `webhook_url` configured, CalDave automatically delivers a webhook POST whenever events change — via the API or inbound email.
+
+| Type | Trigger |
+|------|---------|
+| `event.created` | New event via POST or inbound email |
+| `event.updated` | Event modified via PATCH or inbound email update |
+| `event.deleted` | Event deleted via DELETE or inbound email CANCEL |
+| `event.responded` | Event accepted/declined/tentative via POST respond |
+
+**Payload:**
 ```json
 {
-  "type": "event.upcoming",
-  "calendar_id": "cal_a1b2c3",
-  "event": { ... },
-  "fires_at": "2025-02-15T08:55:00-07:00",
-  "offset": "-5m",
-  "signature": "sha256=..."
+  "type": "event.created",
+  "calendar_id": "cal_...",
+  "event_id": "evt_...",
+  "event": { "id": "evt_...", "title": "Meeting", ... },
+  "timestamp": "2026-02-17T12:00:00.000Z"
 }
 ```
 
-Signature is HMAC-SHA256 of the body using `webhook_secret`.
-
-#### `GET /calendars/:id/webhook-logs`
-List webhook delivery attempts for a calendar. Supports query params:
-- `status` — filter by `pending` / `delivered` / `failed`
-- `limit` / `offset` — pagination
-
-Useful for debugging failed deliveries.
+If `webhook_secret` is set, the payload is signed with HMAC-SHA256 and sent in the `X-CalDave-Signature` header. Delivery is fire-and-forget (no retries). Use `POST /calendars/:id/webhook/test` to verify your endpoint.
 
 ---
 
@@ -477,9 +516,9 @@ Read-only iCalendar feed. Can be subscribed to from Google Calendar, Apple Calen
 ### Inbound Email
 
 #### `POST /inbound/:token`
-Per-calendar webhook endpoint for receiving forwarded emails containing `.ics` calendar invite attachments.
+Per-calendar endpoint for receiving forwarded emails containing `.ics` calendar invite attachments. Creates, updates, or cancels events based on the iCal METHOD.
 
-No Bearer auth. The unguessable `inbound_token` in the URL authenticates the request. Each calendar gets its own unique webhook URL (returned at creation as `inbound_webhook_url`).
+No Bearer auth. The unguessable `inbound_token` in the URL authenticates the request. Each calendar gets its own unique inbound URL (returned at creation as `inbound_webhook_url`).
 
 Supports multiple email-to-webhook providers:
 - **Postmark Inbound** — attachments include base64 content inline in the webhook payload
@@ -691,18 +730,32 @@ For local development or offline use, run the STDIO server directly:
 - `calendars(email)` — for inbound email lookup
 - `calendars(inbound_token)` — partial index for webhook URL lookup
 
-### `webhook_deliveries`
+### `humans`
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | `text` PK | `whd_` prefixed |
-| `calendar_id` | `text` FK | |
-| `event_id` | `text` FK | |
-| `offset` | `text` | e.g. `-5m` |
-| `status` | `text` | `pending` / `delivered` / `failed` |
-| `attempts` | `integer` | Number of delivery attempts |
-| `last_attempt_at` | `timestamptz` | |
-| `response_status` | `integer` | HTTP status from webhook target |
-| `error` | `text` | Nullable, error message on failure |
+| `id` | `text` PK | `hum_` prefixed |
+| `name` | `text` | |
+| `email` | `text` UNIQUE | Case-insensitive index on `LOWER(email)` |
+| `password_hash` | `text` | bcryptjs, 12 salt rounds |
+| `api_key_hash` | `text` | SHA-256 hash of the human API key (`hk_live_...`) |
+| `created_at` | `timestamptz` | |
+
+### `human_agents`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `text` PK | `ha_` prefixed |
+| `human_id` | `text` FK | → humans(id) CASCADE |
+| `agent_id` | `text` FK | → agents(id) CASCADE |
+| `claimed_at` | `timestamptz` | |
+
+UNIQUE(human_id, agent_id)
+
+### `human_sessions`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | `text` PK | `sess_` prefixed |
+| `human_id` | `text` FK | → humans(id) CASCADE |
+| `expires_at` | `timestamptz` | 7-day expiry, cleaned up hourly |
 | `created_at` | `timestamptz` | |
 
 ---
@@ -748,7 +801,7 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 
 1. **Agent provisioning auth** — Open, no operator key. Rate-limited (see Rate Limits section).
 2. **Feed authentication** — Token required. Feed URLs include a token param: `/feeds/:calendar_id.ics?token=feed_abc123`. Token is generated at calendar creation and returned in the response.
-3. **Webhook logs** — Failed deliveries are queryable via `GET /calendars/:id/webhook-logs`.
+3. **Webhook delivery** — Fire-and-forget on event mutations. Use `POST /calendars/:id/webhook/test` to verify endpoint reachability.
 4. **Domain** — `caldave.ai` for v1. Email addresses: `cal-abc123@caldave.ai`.
 5. **Event size limits** — 64KB for description, 16KB for metadata JSON.
 6. **Outbound email** — Implemented. Creating/updating events with attendees sends METHOD:REQUEST invite emails via Postmark. Responding to inbound invites sends METHOD:REPLY emails to the organiser. Requires `POSTMARK_SERVER_TOKEN` env var; gracefully skipped if not set.
@@ -758,7 +811,6 @@ Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-R
 
 ## Out of Scope (v1)
 
-- Web UI / dashboard
 - Calendar sharing between agents
 - Attachments on events
 - Free/busy lookups
