@@ -54,9 +54,9 @@ function formatCalendar(cal) {
   };
 }
 
-const KNOWN_CALENDAR_POST_FIELDS = new Set(['name', 'timezone', 'agentmail_api_key', 'welcome_event', 'webhook_url', 'webhook_secret', 'webhook_offsets']);
+const KNOWN_CALENDAR_POST_FIELDS = new Set(['name', 'timezone', 'agentmail_api_key', 'welcome_event', 'webhook_url', 'webhook_secret']);
 const KNOWN_CALENDAR_PATCH_FIELDS = new Set([
-  'name', 'timezone', 'webhook_url', 'webhook_secret', 'webhook_offsets', 'agentmail_api_key',
+  'name', 'timezone', 'webhook_url', 'webhook_secret', 'agentmail_api_key',
 ]);
 
 function checkUnknownFields(body, knownFields) {
@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
     const unknownErr = checkUnknownFields(req.body, KNOWN_CALENDAR_POST_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
-    const { name, timezone, agentmail_api_key, welcome_event, webhook_url, webhook_secret, webhook_offsets } = req.body;
+    const { name, timezone, agentmail_api_key, welcome_event, webhook_url, webhook_secret } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -98,9 +98,9 @@ router.post('/', async (req, res) => {
     const tz = timezone || 'UTC';
 
     await pool.query(
-      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token, inbound_token, agentmail_api_key, webhook_url, webhook_secret, webhook_offsets)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [id, req.agent.id, name, tz, email, token, inbToken, agentmail_api_key || null, webhook_url || null, webhook_secret || null, webhook_offsets ? JSON.stringify(webhook_offsets) : null]
+      `INSERT INTO calendars (id, agent_id, name, timezone, email, feed_token, inbound_token, agentmail_api_key, webhook_url, webhook_secret)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, req.agent.id, name, tz, email, token, inbToken, agentmail_api_key || null, webhook_url || null, webhook_secret || null]
     );
 
     // Create welcome event unless explicitly opted out
@@ -188,7 +188,7 @@ router.patch('/:id', async (req, res) => {
     const unknownErr = checkUnknownFields(req.body, KNOWN_CALENDAR_PATCH_FIELDS);
     if (unknownErr) return res.status(400).json({ error: unknownErr });
 
-    const { name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key } = req.body;
+    const { name, timezone, webhook_url, webhook_secret, agentmail_api_key } = req.body;
 
     // Input validation
     if (name !== undefined && name.length > 255) {
@@ -212,7 +212,6 @@ router.patch('/:id', async (req, res) => {
     if (timezone !== undefined) { updates.push(`timezone = $${idx++}`); values.push(timezone); }
     if (webhook_url !== undefined) { updates.push(`webhook_url = $${idx++}`); values.push(webhook_url); }
     if (webhook_secret !== undefined) { updates.push(`webhook_secret = $${idx++}`); values.push(webhook_secret); }
-    if (webhook_offsets !== undefined) { updates.push(`webhook_offsets = $${idx++}`); values.push(JSON.stringify(webhook_offsets)); }
     if (agentmail_api_key !== undefined) { updates.push(`agentmail_api_key = $${idx++}`); values.push(agentmail_api_key); }
 
     if (updates.length === 0) {

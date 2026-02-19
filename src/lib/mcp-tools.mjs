@@ -53,8 +53,7 @@ const INSTRUCTIONS = [
   '',
   'Webhooks',
   '--------',
-  'Set webhook_url on a calendar to get notified before events start.',
-  'Use webhook_offsets (e.g. ["-5m", "-15m"]) for advance reminders.',
+  'Set webhook_url on a calendar to get notified when events change.',
   'Test with caldave_test_webhook before relying on it.',
   '',
   'Choosing the right tool',
@@ -178,8 +177,7 @@ export function registerTools(server, callApi, baseUrl, apiKey) {
           '## Webhook notifications',
           '',
           'Set `webhook_url` when creating/updating a calendar. CalDave sends a POST',
-          'request before events start. Configure `webhook_offsets` to control timing',
-          '(e.g. `["-5m", "-15m"]` for 5 and 15 minutes before).',
+          'to your URL whenever events are created, updated, deleted, or responded to.',
           '',
           'If you set a `webhook_secret`, verify the `X-CalDave-Signature` header',
           'using HMAC-SHA256 on the raw request body.',
@@ -335,16 +333,14 @@ export function registerTools(server, callApi, baseUrl, apiKey) {
       timezone: z.string().optional().describe('IANA timezone (default: UTC)'),
       webhook_url: z.string().optional().describe('URL to receive event webhooks'),
       webhook_secret: z.string().optional().describe('Secret for HMAC-SHA256 webhook signatures'),
-      webhook_offsets: z.array(z.union([z.number(), z.string()])).optional().describe('Offsets for pre-event webhook reminders (e.g. [300, 900] or ["-5m", "-1m"])'),
       agentmail_api_key: z.string().optional().describe('AgentMail API key for inbound email attachments'),
       welcome_event: z.boolean().optional().describe('Set to false to skip the auto-created welcome event (default: true)'),
     },
-    async ({ name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key, welcome_event }) => {
+    async ({ name, timezone, webhook_url, webhook_secret, agentmail_api_key, welcome_event }) => {
       const body = { name };
       if (timezone) body.timezone = timezone;
       if (webhook_url) body.webhook_url = webhook_url;
       if (webhook_secret) body.webhook_secret = webhook_secret;
-      if (webhook_offsets) body.webhook_offsets = webhook_offsets;
       if (agentmail_api_key) body.agentmail_api_key = agentmail_api_key;
       if (welcome_event !== undefined) body.welcome_event = welcome_event;
       const data = await callApi('POST', '/calendars', body);
@@ -361,16 +357,14 @@ export function registerTools(server, callApi, baseUrl, apiKey) {
       timezone: z.string().optional().describe('IANA timezone'),
       webhook_url: z.string().optional().describe('URL to receive event notifications'),
       webhook_secret: z.string().optional().describe('HMAC secret for webhook signatures'),
-      webhook_offsets: z.array(z.union([z.number(), z.string()])).optional().describe('Reminder offsets, e.g. ["-5m", "-1m"]'),
       agentmail_api_key: z.string().optional().describe('AgentMail API key'),
     },
-    async ({ calendar_id, name, timezone, webhook_url, webhook_secret, webhook_offsets, agentmail_api_key }) => {
+    async ({ calendar_id, name, timezone, webhook_url, webhook_secret, agentmail_api_key }) => {
       const body = {};
       if (name !== undefined) body.name = name;
       if (timezone !== undefined) body.timezone = timezone;
       if (webhook_url !== undefined) body.webhook_url = webhook_url;
       if (webhook_secret !== undefined) body.webhook_secret = webhook_secret;
-      if (webhook_offsets !== undefined) body.webhook_offsets = webhook_offsets;
       if (agentmail_api_key !== undefined) body.agentmail_api_key = agentmail_api_key;
       const data = await callApi('PATCH', `/calendars/${calendar_id}`, body);
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };

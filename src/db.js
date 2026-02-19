@@ -41,7 +41,6 @@ async function initSchema() {
       feed_token      text,
       webhook_url     text,
       webhook_secret  text,
-      webhook_offsets jsonb DEFAULT '[\"-5m\"]',
       inbound_token   text UNIQUE,
       created_at      timestamptz NOT NULL DEFAULT now()
     );

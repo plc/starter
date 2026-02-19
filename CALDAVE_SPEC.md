@@ -352,12 +352,11 @@ Create a new calendar for the authenticated agent.
   "timezone": "America/Denver",
   "webhook_url": "https://example.com/webhook",
   "webhook_secret": "my_secret",
-  "webhook_offsets": [300, 900],
   "welcome_event": false
 }
 ```
 
-Optional fields: `timezone` (default UTC), `webhook_url`, `webhook_secret`, `webhook_offsets`, `agentmail_api_key`, `welcome_event` (default true — set to false to skip the auto-created welcome event).
+Optional fields: `timezone` (default UTC), `webhook_url`, `webhook_secret`, `agentmail_api_key`, `welcome_event` (default true — set to false to skip the auto-created welcome event).
 
 **Response:**
 ```json
@@ -475,8 +474,7 @@ Set or update webhook configuration:
 ```json
 {
   "webhook_url": "https://my-agent.fly.dev/hooks/calendar",
-  "webhook_secret": "whsec_...",
-  "webhook_offsets": ["-5m", "-1m", "0"]
+  "webhook_secret": "whsec_..."
 }
 ```
 
@@ -697,7 +695,6 @@ For local development or offline use, run the STDIO server directly:
 | `feed_token` | `text` | Token for iCal feed auth |
 | `webhook_url` | `text` | Nullable |
 | `webhook_secret` | `text` | Nullable |
-| `webhook_offsets` | `jsonb` | Default `["-5m"]` |
 | `inbound_token` | `text` UNIQUE | `inb_` prefixed, for per-calendar webhook URL |
 | `agentmail_api_key` | `text` | Nullable, for fetching AgentMail attachments |
 | `created_at` | `timestamptz` | |

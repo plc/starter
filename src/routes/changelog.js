@@ -253,7 +253,7 @@ const CHANGELOG = [
       {
         type: 'feature',
         title: 'Webhook config at calendar creation',
-        description: 'POST /calendars now accepts webhook_url, webhook_secret, and webhook_offsets so you can configure webhooks in a single call instead of a separate PATCH.',
+        description: 'POST /calendars now accepts webhook_url and webhook_secret so you can configure webhooks in a single call instead of a separate PATCH.',
         endpoints: ['POST /calendars'],
         docs: BASE + '/docs#post-calendars',
       },

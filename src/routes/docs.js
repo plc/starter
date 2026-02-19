@@ -399,7 +399,6 @@ const cachedHtml = `<!DOCTYPE html>
         <div class="param"><span class="param-name">agentmail_api_key <span class="param-opt">optional</span></span><span class="param-desc">AgentMail API key for fetching inbound email attachments</span></div>
         <div class="param"><span class="param-name">webhook_url <span class="param-opt">optional</span></span><span class="param-desc">URL to receive event webhooks (must be a valid URL)</span></div>
         <div class="param"><span class="param-name">webhook_secret <span class="param-opt">optional</span></span><span class="param-desc">Secret for HMAC-SHA256 webhook signatures (sent in <code class="inline-code">X-CalDave-Signature</code> header)</span></div>
-        <div class="param"><span class="param-name">webhook_offsets <span class="param-opt">optional</span></span><span class="param-desc">Reserved for future pre-event reminders. Stored but not yet acted on.</span></div>
         <div class="param"><span class="param-name">welcome_event <span class="param-opt">optional</span></span><span class="param-desc">Set to <code class="inline-code">false</code> to skip the auto-created welcome event (recommended for production agents). Defaults to true.</span></div>
       </div>
       <div class="label">Example</div>
@@ -457,7 +456,6 @@ const cachedHtml = `<!DOCTYPE html>
         <div class="param"><span class="param-name">timezone</span><span class="param-desc">IANA timezone</span></div>
         <div class="param"><span class="param-name">webhook_url</span><span class="param-desc">URL to receive event notifications</span></div>
         <div class="param"><span class="param-name">webhook_secret</span><span class="param-desc">HMAC secret for webhook signatures</span></div>
-        <div class="param"><span class="param-name">webhook_offsets</span><span class="param-desc">Reserved for future pre-event reminders</span></div>
         <div class="param"><span class="param-name">agentmail_api_key</span><span class="param-desc">AgentMail API key for this calendar</span></div>
       </div>
       <div class="label">Example</div>
