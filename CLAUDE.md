@@ -169,6 +169,16 @@ await db.close();
 console.log(db.dbType); // 'sqlite' or 'postgres'
 ```
 
+## API Key Conventions
+
+If the project generates or uses API keys, **never use the `sk_live_` or `sk_test_` prefix**. GitHub's secret scanner matches these as Stripe API keys and will block pushes -- even if the values are dummy/example strings.
+
+Recommended prefixes:
+- `key_live_` / `key_test_` -- generic, no collision with known providers
+- A project-specific prefix (e.g. `cd_live_` for CalDave, `xx_live_` for XX)
+
+This applies to application code, example values in docs, `.env.example`, and seed data.
+
 ## Deploying to Fly.io
 
 See [fly-deploy.md](fly-deploy.md) for full deployment instructions, troubleshooting, and the MPG vs legacy Fly Postgres comparison.

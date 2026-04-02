@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Graceful shutdown handler (SIGTERM/SIGINT) -- closes DB connection and HTTP server cleanly
 - `PG_USER` and `PG_PASSWORD` env vars in docker-compose.postgres.yml (no more hardcoded credentials)
 
+### Added
+- API key convention in CLAUDE.md: avoid `sk_live_`/`sk_test_` prefixes (GitHub secret scanner blocks them) (fixes #1)
+
 ### Changed
 - Init Step 1 now removes the starter origin (`git remote remove origin`) to prevent accidental commits back to plc/starter
 - Claude will file GitHub issues on plc/starter if it finds bugs in the starter repo itself
