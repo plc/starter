@@ -19,6 +19,11 @@ const db = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const appName = process.env.APP_NAME || 'myapp';
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 // Middleware
 app.use(express.json());
@@ -67,7 +72,7 @@ app.get('/health/db', async (req, res) => {
  * Shows green indicators for working services, red for failures
  */
 app.get('/', async (req, res) => {
-  const appName = process.env.npm_package_name || 'myapp';
+  const safeAppName = escapeHtml(appName);
   const serverTime = new Date().toISOString();
 
   // Check database connection
@@ -92,7 +97,7 @@ app.get('/', async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${appName}</title>
+  <title>${safeAppName}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -116,7 +121,7 @@ app.get('/', async (req, res) => {
 </head>
 <body>
   <div class="container">
-    <h1>${appName}</h1>
+    <h1>${safeAppName}</h1>
 
     <div class="card">
       <h2>Server</h2>
@@ -172,6 +177,19 @@ app.get('/', async (req, res) => {
 });
 
 // Start server on all interfaces (0.0.0.0) for Docker compatibility
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port} (${db.dbType})`);
 });
+
+// Graceful shutdown
+function shutdown() {
+  console.log('Shutting down...');
+  server.close(async () => {
+    await db.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 5000);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

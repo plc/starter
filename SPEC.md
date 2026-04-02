@@ -74,11 +74,14 @@ When adding features:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `APP_NAME` | `myapp` | Application name (shown on status page) |
 | `PORT` | `3000` | Server port (generated from project name via `scripts/get-port.sh`) |
 | `DB_TYPE` | `sqlite` | Database type: `sqlite` or `postgres` |
 | `SQLITE_PATH` | `./data/myapp.db` | Path to SQLite database file |
 | `DATABASE_URL` | - | PostgreSQL connection string (when DB_TYPE=postgres) |
 | `DB_NAME` | `myapp` | Database name for PostgreSQL init script |
+| `PG_USER` | `plc` | PostgreSQL username (docker-compose.postgres.yml only) |
+| `PG_PASSWORD` | `postgres` | PostgreSQL password (docker-compose.postgres.yml only) |
 
 ## Database
 

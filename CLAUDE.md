@@ -40,6 +40,7 @@ Ask the user whether to use SQLite or PostgreSQL. **Default to SQLite** unless t
 **If PostgreSQL chosen:**
 - Replace `docker-compose.yml` with `docker-compose.postgres.yml` (rename it)
 - `npm uninstall better-sqlite3`
+- In `Dockerfile`, remove the `apk add` and `apk del` lines (no native build tools needed)
 - In `.env.example`, uncomment PostgreSQL vars and remove SQLite vars
 - In `fly.toml`, change `DB_TYPE` to `"postgres"` and remove the `[mounts]` comment block
 
@@ -62,7 +63,7 @@ Otherwise, remind the user to add a remote later.
 ### Step 2: Rename `myapp` to the project name
 
 ```bash
-sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example
+sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example .dockerignore
 ```
 
 (If PostgreSQL: also rename in `docker-compose.postgres.yml`)
@@ -155,7 +156,7 @@ The app uses `src/db.js` as a thin abstraction over SQLite or PostgreSQL. The `D
 ```javascript
 const db = require('./db');
 
-// Query (returns { rows: [...] })
+// Query -- returns { rows } for reads, { rows, changes, lastInsertRowid } for writes
 const result = await db.query('SELECT * FROM users WHERE id = ?', [1]);
 
 // Health check (returns { time, version })
@@ -170,107 +171,14 @@ console.log(db.dbType); // 'sqlite' or 'postgres'
 
 ## Deploying to Fly.io
 
-### Step 1: Create the App
+See [fly-deploy.md](fly-deploy.md) for full deployment instructions, troubleshooting, and the MPG vs legacy Fly Postgres comparison.
 
-```bash
-fly launch
-# - Choose app name and region
-# - Say NO to Postgres (we set it up separately if needed)
-# - Say NO to deploy now
-```
+**Quick reference:**
 
-### SQLite on Fly.io
-
-1. Create a volume for the SQLite file:
-   ```bash
-   fly volumes create data --size 1 --region sjc
-   ```
-
-2. Uncomment the `[mounts]` section in `fly.toml`:
-   ```toml
-   [mounts]
-     source = "data"
-     destination = "/app/data"
-   ```
-
-3. Scale to exactly 1 machine (SQLite does not support multiple writers):
-   ```bash
-   fly scale count 1
-   ```
-
-4. Deploy:
-   ```bash
-   fly deploy
-   ```
-
-### PostgreSQL on Fly.io
-
-**Use the Fly Dashboard (not CLI) for Managed Postgres:**
-
-1. Go to https://fly.io/dashboard -> Postgres -> Create
-2. Choose a name and region (same region as your app)
-3. Note the **cluster ID** (e.g., `abc123xyz`) -- needed for CLI access
-4. Go to **Extensions** tab -> enable any needed extensions (e.g., "vector" for pgvector)
-5. Go to **Connect** tab -> copy the connection string
-
-```bash
-fly secrets set DATABASE_URL="postgres://postgres:PASSWORD@CLUSTER.pooler.fly.io:5432/fly-db?sslmode=require" -a YOUR_APP
-fly deploy
-```
-
-### Fly Postgres: Two Different Products
-
-Fly has **two separate Postgres products** with different CLI commands:
-
-|                    | Managed Postgres (MPG)      | Old Fly Postgres           |
-|--------------------|-----------------------------|-----------------------------|
-| **Status**         | Current, recommended        | Legacy                      |
-| **Created via**    | Dashboard or `fly mpg create` | `fly postgres create`     |
-| **Is a Fly app?**  | No                          | Yes                         |
-| **Listed by**      | `fly mpg list`              | `fly postgres list`         |
-| **Connect via**    | `fly mpg connect <cluster-id>` | `fly postgres connect -a <app>` |
-| **Attach to app**  | Manual `fly secrets set`    | `fly postgres attach`       |
-| **Default DB name**| `fly-db`                    | User-specified              |
-
-### Common Mistakes to Avoid
-
-- **Don't use `fly postgres attach`** -- Only works with old Fly Postgres, not MPG
-- **Don't expect `fly postgres list` to show MPG clusters** -- Use `fly mpg list` instead
-- **Don't use `fly proxy` with MPG** -- Use `fly mpg connect <cluster-id>` instead
-- **The database name is `fly-db`** -- Not the cluster name, not your app name
-
-### Connecting to Managed Postgres
-
-```bash
-# Interactive psql session
-fly mpg connect <cluster-id>
-
-# Proxy for local tools (runs in foreground)
-fly mpg connect <cluster-id> --port 15432
-
-# Then in another terminal:
-psql "postgres://postgres:PASSWORD@localhost:15432/fly-db"
-```
-
-### Syncing Local Database to Fly
-
-```bash
-# Terminal 1: Start proxy
-fly mpg connect <cluster-id> --port 15432
-
-# Terminal 2: Dump and restore
-docker exec PROJECT_NAME-db-1 pg_dump -U plc --clean --if-exists DATABASE_NAME > backup.sql
-psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
-```
-
-### Troubleshooting Fly Postgres
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "App not found" on `fly postgres attach` | You have MPG, not old Fly Postgres | Use `fly secrets set DATABASE_URL` instead |
-| `fly postgres list` shows nothing | MPG clusters aren't apps | Use `fly mpg list` |
-| Can't connect with `fly proxy` | MPG uses different command | Use `fly mpg connect <cluster-id> --port 15432` |
-| "role postgres does not exist" on deploy | DATABASE_URL secret not set | Run `fly secrets set DATABASE_URL="..."` |
+- `fly launch` -- say NO to Postgres, NO to deploy now
+- **SQLite**: Create volume, uncomment `[mounts]` in fly.toml, scale to 1 machine, deploy
+- **PostgreSQL**: Create Managed Postgres via Fly Dashboard, `fly secrets set DATABASE_URL="..."`, deploy
+- **Key gotcha**: Fly has two Postgres products. Use `fly mpg` commands (not `fly postgres`) for Managed Postgres
 
 ## Docker
 

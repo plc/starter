@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `SQLITE_PATH` environment variable for SQLite file location
 - SQLite volume mount option in `fly.toml` for Fly.io deployment
 - `.claude/settings.json` with default Claude Code permissions
+- `.dockerignore` to speed up Docker builds (excludes node_modules, .git, docs, data)
+- `APP_NAME` environment variable for status page display name
+- Graceful shutdown handler (SIGTERM/SIGINT) -- closes DB connection and HTTP server cleanly
+- `PG_USER` and `PG_PASSWORD` env vars in docker-compose.postgres.yml (no more hardcoded credentials)
 
 ### Changed
 - Init Step 1 now removes the starter origin (`git remote remove origin`) to prevent accidental commits back to plc/starter
@@ -24,6 +28,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Status page and health endpoints now show database type
 - Updated all documentation for dual-database support
 - Replaced `.claude/settings.local.json` with clean `.claude/settings.json`
+- SQLite query detection in db.js now uses `stmt.reader` instead of SQL string parsing (correctly handles RETURNING, EXPLAIN, comments, etc.)
+- Status page app name comes from `APP_NAME` env var instead of `npm_package_name` (works in Docker CMD)
+- Status page HTML escapes app name to prevent XSS
+- Fly.io deployment details in CLAUDE.md replaced with reference to fly-deploy.md (saves tokens)
+- PostgreSQL init step now includes Dockerfile cleanup (remove native build tool lines)
+
+### Fixed
+- SQL injection in `scripts/init-db.sh` -- database name now quoted as identifier
+- db.js incorrectly classified RETURNING, EXPLAIN, VALUES queries as write operations
+- Status page showed "myapp" in production because `npm_package_name` is only set via `npm start`
 
 ### Notes
 - Database choice is permanent per project, made at init time (Step 0)

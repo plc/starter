@@ -61,6 +61,18 @@ This file documents confusing issues, mistakes, and lessons learned. When Claude
 
 **Prevention**: Check `db.dbType` if unsure. The database choice is set at init time via `DB_TYPE` env var.
 
+### Dockerfile Installs Native Build Tools Even in PostgreSQL Mode
+
+**Date**: 2026-04-02
+
+**Problem**: The Dockerfile installs `python3 make g++` for `better-sqlite3` native compilation, even if the project chose PostgreSQL and removed `better-sqlite3`.
+
+**Cause**: The Dockerfile is generic and supports both database modes. After `npm uninstall better-sqlite3`, the build tools are installed and removed for no reason, adding build time.
+
+**Solution**: After removing `better-sqlite3` during init (Step 0), also remove the `apk add` and `apk del` lines from the Dockerfile.
+
+**Prevention**: When choosing PostgreSQL during init, strip the native build tool lines from the Dockerfile.
+
 ---
 
 <!-- Add new post-mortems above this line -->

@@ -1,0 +1,12 @@
+node_modules
+.git
+data
+*.db
+.env
+.claude
+fly-deploy.md
+CLAUDE.md
+CHANGELOG.md
+GOTCHAS.md
+SPEC.md
+README.md

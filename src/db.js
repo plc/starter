@@ -58,9 +58,7 @@ if (dbType === 'postgres') {
 
   query = async (sql, params) => {
     const stmt = db.prepare(sql);
-    if (sql.trim().toUpperCase().startsWith('SELECT') ||
-        sql.trim().toUpperCase().startsWith('WITH') ||
-        sql.trim().toUpperCase().startsWith('PRAGMA')) {
+    if (stmt.reader) {
       const rows = params ? stmt.all(...params) : stmt.all();
       return { rows };
     }
