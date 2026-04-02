@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(docker compose:*)",
+      "Bash(./scripts/get-port.sh:*)",
+      "Bash(npm:*)",
+      "Bash(lsof:*)"
+    ]
+  }
+}

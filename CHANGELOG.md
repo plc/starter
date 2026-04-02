@@ -7,6 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- SQLite support as the default database (via `better-sqlite3`)
+- Database abstraction layer (`src/db.js`) supporting both SQLite and PostgreSQL
+- `docker-compose.postgres.yml` for PostgreSQL mode
+- `DB_TYPE` environment variable to choose database backend
+- `SQLITE_PATH` environment variable for SQLite file location
+- SQLite volume mount option in `fly.toml` for Fly.io deployment
+- `.claude/settings.json` with default Claude Code permissions
+
+### Changed
+- Init Step 1 now removes the starter origin (`git remote remove origin`) to prevent accidental commits back to plc/starter
+- Claude will file GitHub issues on plc/starter if it finds bugs in the starter repo itself
+- Default database is now SQLite (was PostgreSQL)
+- `docker-compose.yml` now runs in SQLite mode (no init-db service needed)
+- `src/index.js` uses `db.js` abstraction instead of direct `pg` usage
+- Status page and health endpoints now show database type
+- Updated all documentation for dual-database support
+- Replaced `.claude/settings.local.json` with clean `.claude/settings.json`
+
+### Notes
+- Database choice is permanent per project, made at init time (Step 0)
+- SQLite uses `?` parameter placeholders; PostgreSQL uses `$1`
+- SQLite on Fly.io requires a volume and exactly 1 machine
+- `better-sqlite3` requires native build tools in Alpine Docker (handled in Dockerfile)
+- Both database drivers ship in package.json; the unused one is removed during project init
+
+---
+
+## [0.1.0] - 2026-03-01
+
+### Added
 - Initial project setup
 - Express.js server with health check endpoints (`/health`, `/health/db`)
 - Status page at `/` showing server and database health
@@ -28,7 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Run `fly launch` before `fly deploy` to create the app on Fly.io
 - Port is generated from project name hash to avoid conflicts when running multiple projects
 - **Fly Postgres has two products**: Managed Postgres (MPG) is current/recommended; old Fly Postgres is legacy
-- MPG clusters are NOT Fly apps — use `fly mpg` commands, not `fly postgres` commands
+- MPG clusters are NOT Fly apps -- use `fly mpg` commands, not `fly postgres` commands
 
 ---
 

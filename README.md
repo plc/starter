@@ -1,6 +1,6 @@
 # Starter
 
-A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deployment.
+A minimal Node.js starter template with SQLite/PostgreSQL, Docker, and Fly.io deployment.
 
 ## Documentation
 
@@ -14,7 +14,7 @@ A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deploymen
 ## What's Included
 
 - **Express.js** server with health check endpoints
-- **PostgreSQL** database connection
+- **SQLite** database (default) or **PostgreSQL** (optional)
 - **Docker** setup for local development
 - **Fly.io** configuration for production deployment
 - **Status page** at `/` showing server and database health
@@ -24,7 +24,7 @@ A minimal Node.js starter template with PostgreSQL, Docker, and Fly.io deploymen
 - [Docker](https://www.docker.com/) (required)
 - [Node.js](https://nodejs.org/) v20+ (optional, for local dev without Docker)
 - [Fly CLI](https://fly.io/docs/flyctl/install/) (for production deployment)
-- PostgreSQL running locally on port 5432
+- PostgreSQL running locally on port 5432 (only if using PostgreSQL mode)
 
 ## Quick Start
 
@@ -36,24 +36,36 @@ docker compose up --build
 
 Open http://127.0.0.1:3000 to see the status page.
 
-That's it! The database is created automatically.
+That's it! SQLite is the default -- no external database needed.
+
+## Database Options
+
+This starter supports two database backends, chosen at project init time:
+
+| | SQLite (default) | PostgreSQL |
+|---|---|---|
+| **Best for** | Simple apps, prototypes, MVPs | Multi-user apps, complex queries |
+| **Setup** | Zero config | Requires PostgreSQL on host |
+| **Compose file** | `docker-compose.yml` | `docker-compose.postgres.yml` |
+| **Fly.io** | Volume + 1 machine | Managed Postgres (MPG) |
+
+See CLAUDE.md "Step 0: Choose Database" for decision criteria.
 
 ## Project Structure
 
 ```
-├── src/
-│   ├── index.js          # Express server with routes and status page
-│   └── healthcheck.js    # Health check script for testing
-├── scripts/
-│   ├── init-db.sh        # Creates database if it doesn't exist
-│   └── get-port.sh       # Generates deterministic port from project name
-├── Dockerfile            # Production container image
-├── docker-compose.yml    # Local development setup
-├── fly.toml              # Fly.io deployment configuration
-├── package.json          # Node.js dependencies and scripts
-├── .env.example          # Environment variable template
-├── .gitignore            # Git ignore rules
-└── CLAUDE.md             # Instructions for AI assistants
+src/
+  index.js          # Express server with routes and status page
+  db.js             # Database abstraction (SQLite/PostgreSQL)
+  healthcheck.js    # Health check script for testing
+scripts/
+  init-db.sh        # Creates PostgreSQL database if needed
+  get-port.sh       # Generates deterministic port from project name
+Dockerfile          # Production container image
+docker-compose.yml          # Local dev (SQLite mode)
+docker-compose.postgres.yml # Local dev (PostgreSQL mode)
+fly.toml            # Fly.io deployment configuration
+.claude/            # Claude Code settings
 ```
 
 ## Configuration
@@ -63,8 +75,10 @@ That's it! The database is created automatically.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port (use `./scripts/get-port.sh` for deterministic port) |
-| `DATABASE_URL` | `postgres://plc:postgres@host.docker.internal:5432/myapp` | PostgreSQL connection string |
-| `DB_NAME` | `myapp` | Database name (used by init script) |
+| `DB_TYPE` | `sqlite` | Database backend: `sqlite` or `postgres` |
+| `SQLITE_PATH` | `./data/myapp.db` | SQLite database file path |
+| `DATABASE_URL` | - | PostgreSQL connection string (when DB_TYPE=postgres) |
+| `DB_NAME` | `myapp` | Database name for PostgreSQL init script |
 
 ### Customizing for Your Project
 
@@ -82,18 +96,7 @@ sed -i '' "s/PORT=3000/PORT=$PORT/" .env.example
 cp .env.example .env
 ```
 
-```bash
-# On Linux
-sed -i 's/myapp/my-project-name/g' package.json docker-compose.yml .env.example
-PORT=$(./scripts/get-port.sh my-project-name)
-sed -i "s/PORT=3000/PORT=$PORT/" .env.example
-cp .env.example .env
-```
-
-Or manually update these files:
-- `package.json` - change `"name": "myapp"`
-- `docker-compose.yml` - change `DB_NAME` and database name in `DATABASE_URL`
-- `.env.example` - change database name in `DATABASE_URL`, `DB_NAME`, and `PORT`
+Or manually update `package.json`, `docker-compose.yml`, and `.env.example`.
 
 ## API Endpoints
 
@@ -101,18 +104,18 @@ Or manually update these files:
 |----------|-------------|
 | `GET /` | Status page showing server and database health |
 | `GET /health` | JSON health check (server only) |
-| `GET /health/db` | JSON health check (server + database) |
+| `GET /health/db` | JSON health check (server + database, shows DB type) |
 
 ## Local Development
 
 ### With Docker (Recommended)
 
 ```bash
-# Start the app (builds and runs in foreground)
+# SQLite mode (default)
 docker compose up --build
 
-# Or run in background
-docker compose up --build -d
+# PostgreSQL mode
+docker compose -f docker-compose.postgres.yml up --build
 
 # View logs
 docker compose logs -f app
@@ -129,10 +132,6 @@ npm install
 
 # Create and configure .env
 cp .env.example .env
-# Edit .env: change host.docker.internal to localhost
-
-# Create the database manually
-createdb myapp
 
 # Start the server with auto-reload
 npm run dev
@@ -145,94 +144,42 @@ npm test
 
 > **See [fly-deploy.md](fly-deploy.md) for complete reference and troubleshooting.**
 
-### First-Time Setup
-
-1. **Install Fly CLI** and login:
-   ```bash
-   # macOS
-   brew install flyctl
-   fly auth login
-   ```
-
-2. **Launch your app**:
-   ```bash
-   fly launch
-   # - Choose app name and region
-   # - Say NO to Postgres (we create it separately)
-   # - Say NO to deploy now
-   ```
-
-3. **Create Managed Postgres** (via Dashboard):
-   - Go to https://fly.io/dashboard → Postgres → Create
-   - Choose same region as your app
-   - Note the **cluster ID** and copy the **connection string** from Connect tab
-
-4. **Set DATABASE_URL and deploy**:
-   ```bash
-   fly secrets set DATABASE_URL="postgres://postgres:PASSWORD@CLUSTER.pooler.fly.io:5432/fly-db?sslmode=require"
-   fly deploy
-   ```
-
-### Verify Deployment
+### SQLite Deployment
 
 ```bash
-fly status
-fly logs
-fly open
-```
-
-### Subsequent Deploys
-
-```bash
+fly launch                              # Create app (say NO to Postgres, NO to deploy)
+fly volumes create data --size 1        # Create volume for SQLite
+# Uncomment [mounts] section in fly.toml
+fly scale count 1                       # SQLite needs exactly 1 machine
 fly deploy
 ```
 
-### ⚠️ Important: Fly Postgres Products
+### PostgreSQL Deployment
 
-Fly has **two Postgres products**. Use **Managed Postgres (MPG)** — it's the current recommended option.
-
-- Create via **Dashboard**, not `fly postgres create`
-- Use `fly mpg list` (not `fly postgres list`)
-- Use `fly mpg connect <cluster-id>` (not `fly proxy`)
-- Database name is always `fly-db`
+```bash
+fly launch                              # Create app (say NO to Postgres, NO to deploy)
+# Create Managed Postgres via Fly Dashboard
+fly secrets set DATABASE_URL="..."      # Set connection string
+fly deploy
+```
 
 See [fly-deploy.md](fly-deploy.md) for details.
 
 ## Troubleshooting
 
-### Database connection failed
+### Database connection failed (PostgreSQL mode)
 
-1. **Local**: Make sure PostgreSQL is running on port 5432
-   ```bash
-   # Check if postgres is running
-   pg_isready
-   ```
-
-2. **Docker**: The init-db script creates the database automatically. Check logs:
-   ```bash
-   docker compose logs init-db
-   ```
-
-3. **Fly.io**: Make sure DATABASE_URL is set:
-   ```bash
-   fly secrets list
-   # If missing, set it manually (see fly-deploy.md)
-   ```
+1. Make sure PostgreSQL is running on port 5432: `pg_isready`
+2. Check init-db logs: `docker compose -f docker-compose.postgres.yml logs init-db`
+3. On Fly.io, check DATABASE_URL: `fly secrets list`
 
 ### Port already in use
 
-Change the port in docker-compose.yml:
-```yaml
-ports:
-  - "3001:3000"  # Use port 3001 instead
-```
+Change the port in your `.env` file or docker-compose.yml.
 
 ### Browser redirects to HTTPS
 
-Your browser may have cached an HTTPS redirect. Try:
-- Use `http://127.0.0.1:3000` instead of `localhost`
-- Use an incognito/private window
-- Clear HSTS settings for localhost
+Use `http://127.0.0.1:PORT` instead of `localhost`. Or use an incognito window.
 
 ## Scripts
 

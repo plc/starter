@@ -1,0 +1,42 @@
+# Docker Compose configuration for local development (PostgreSQL mode)
+#
+# Architecture:
+#   host postgres (5432) <- init-db (migrations) <- app (node.js)
+#
+# Usage:
+#   docker compose -f docker-compose.postgres.yml up --build     # Start everything
+#   docker compose -f docker-compose.postgres.yml down           # Stop everything
+#   docker compose -f docker-compose.postgres.yml logs -f app    # View app logs
+#
+# Prerequisites:
+#   PostgreSQL running on host machine (port 5432)
+#
+# Port: Determined by project name. Run ./scripts/get-port.sh to see your port.
+
+services:
+  # Database initialization - runs migrations then exits
+  init-db:
+    image: postgres:16-alpine
+    environment:
+      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DB_NAME=${DB_NAME:-myapp}
+    volumes:
+      - ./scripts/init-db.sh:/init-db.sh:ro
+    entrypoint: ["/init-db.sh"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Node.js application
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      - DB_TYPE=postgres
+      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
+      - PORT=${PORT:-3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      init-db:
+        condition: service_completed_successfully

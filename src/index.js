@@ -3,26 +3,22 @@
  *
  * This is the entry point for the application. It sets up:
  * - Express.js web server
- * - PostgreSQL database connection pool
+ * - Database connection (SQLite or PostgreSQL)
  * - Health check endpoints
  * - Status page at /
  *
  * Environment variables:
  * - PORT: Server port (default: 3000)
- * - DATABASE_URL: PostgreSQL connection string
+ * - DB_TYPE: Database type - 'sqlite' (default) or 'postgres'
+ * - SQLITE_PATH: Path to SQLite database file (default: ./data/myapp.db)
+ * - DATABASE_URL: PostgreSQL connection string (when DB_TYPE=postgres)
  */
 
 const express = require('express');
-const { Pool } = require('pg');
+const db = require('./db');
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-// PostgreSQL connection pool
-// Uses DATABASE_URL environment variable for connection string
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 // Middleware
 app.use(express.json());
@@ -38,24 +34,26 @@ app.get('/health', (req, res) => {
 
 /**
  * GET /health/db
- * Database health check - verifies PostgreSQL connection
+ * Database health check - verifies database connection
  * Returns database time and version if connected
  */
 app.get('/health/db', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW() as time, version() as version');
+    const health = await db.healthCheck();
     res.json({
       status: 'ok',
       database: {
+        type: db.dbType,
         connected: true,
-        time: result.rows[0].time,
-        version: result.rows[0].version,
+        time: health.time,
+        version: health.version,
       },
     });
   } catch (error) {
     res.status(500).json({
       status: 'error',
       database: {
+        type: db.dbType,
         connected: false,
         error: error.message,
       },
@@ -75,16 +73,18 @@ app.get('/', async (req, res) => {
   // Check database connection
   let dbStatus = { connected: false, time: null, version: null, error: null };
   try {
-    const result = await pool.query('SELECT NOW() as time, version() as version');
+    const health = await db.healthCheck();
     dbStatus = {
       connected: true,
-      time: result.rows[0].time,
-      version: result.rows[0].version.split(' ')[0] + ' ' + result.rows[0].version.split(' ')[1],
+      time: health.time,
+      version: health.version,
       error: null,
     };
   } catch (error) {
     dbStatus.error = error.message;
   }
+
+  const dbLabel = db.dbType === 'postgres' ? 'PostgreSQL' : 'SQLite';
 
   // Render status page HTML
   const html = `<!DOCTYPE html>
@@ -133,7 +133,7 @@ app.get('/', async (req, res) => {
     </div>
 
     <div class="card">
-      <h2>Database</h2>
+      <h2>Database (${dbLabel})</h2>
       <div class="status">
         <span class="dot ${dbStatus.connected ? 'green' : 'red'}"></span>
         <span class="label">Status</span>
@@ -173,5 +173,5 @@ app.get('/', async (req, res) => {
 
 // Start server on all interfaces (0.0.0.0) for Docker compatibility
 app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`Server running on port ${port} (${db.dbType})`);
 });

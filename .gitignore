@@ -23,6 +23,12 @@ Thumbs.db
 *.swo
 *~
 
+# SQLite
+data/
+*.db
+*.db-wal
+*.db-shm
+
 # Build output
 dist/
 build/

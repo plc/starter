@@ -6,7 +6,7 @@ Project-specific details and context. This file is unique to each project.
 
 This is a Node.js starter template with:
 - Express.js web server
-- PostgreSQL database
+- Database support (SQLite default, PostgreSQL optional)
 - Docker for local development
 - Fly.io for production deployment
 
@@ -49,13 +49,15 @@ For first-time setup, see [fly-deploy.md](fly-deploy.md).
 ## Project Structure
 
 ```
-src/index.js        - Main Express server with routes
-src/healthcheck.js  - Health check script
-scripts/init-db.sh  - Database initialization (Docker only)
-scripts/get-port.sh - Deterministic port generation from project name
-Dockerfile          - Production container
-docker-compose.yml  - Local development
-fly.toml            - Fly.io configuration
+src/index.js              - Main Express server with routes
+src/db.js                 - Database abstraction (SQLite/PostgreSQL)
+src/healthcheck.js        - Health check script
+scripts/init-db.sh        - PostgreSQL database initialization (Docker only)
+scripts/get-port.sh       - Deterministic port generation from project name
+Dockerfile                - Production container
+docker-compose.yml        - Local development (SQLite mode)
+docker-compose.postgres.yml - Local development (PostgreSQL mode)
+fly.toml                  - Fly.io configuration
 ```
 
 ## Key Files to Modify
@@ -63,31 +65,35 @@ fly.toml            - Fly.io configuration
 When adding features:
 
 - **src/index.js** - Add new routes and endpoints
+- **src/db.js** - Database queries use this module
 - **package.json** - Add new dependencies
 - **docker-compose.yml** - Add new services or environment variables
 - **fly.toml** - Modify deployment settings
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Server port (generated from project name via `scripts/get-port.sh`) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DB_NAME` | Database name for init script |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port (generated from project name via `scripts/get-port.sh`) |
+| `DB_TYPE` | `sqlite` | Database type: `sqlite` or `postgres` |
+| `SQLITE_PATH` | `./data/myapp.db` | Path to SQLite database file |
+| `DATABASE_URL` | - | PostgreSQL connection string (when DB_TYPE=postgres) |
+| `DB_NAME` | `myapp` | Database name for PostgreSQL init script |
 
 ## Database
 
-- **Local**: PostgreSQL runs on host machine (accessed via `host.docker.internal:5432`)
-- **Production**: Fly Managed Postgres (DATABASE_URL set manually via `fly secrets set`)
+- **SQLite (default)**: File-based, stored at `SQLITE_PATH`. No external database needed.
+- **PostgreSQL**: Connects via `DATABASE_URL`. Local dev uses host PostgreSQL via `host.docker.internal:5432`.
 
-The `scripts/init-db.sh` creates the database if needed and runs migrations.
+The `src/db.js` module provides a uniform `query()` interface for both backends.
 
-See [fly-deploy.md](fly-deploy.md) for Fly Postgres setup.
+Parameter placeholders differ: SQLite uses `?`, PostgreSQL uses `$1`.
+
+See [fly-deploy.md](fly-deploy.md) for Fly deployment with either database.
 
 ## Important Notes
 
 1. **Don't modify fly.toml app name manually** - It gets set by `fly launch`
-2. **DATABASE_URL format**: `postgres://user:password@host:port/database`
-3. **Local uses `host.docker.internal`** - Connects to host PostgreSQL, not a containerized one
-4. **One PostgreSQL, many databases** - Each project has its own database name
-5. **Deterministic ports** - Each project gets a unique port (3000-3999) based on its name to avoid conflicts
+2. **DB choice is permanent per project** - Chosen at init time, not runtime-switchable
+3. **SQLite on Fly.io requires a volume** and exactly 1 machine
+4. **Deterministic ports** - Each project gets a unique port (3000-3999) based on its name to avoid conflicts

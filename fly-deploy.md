@@ -1,6 +1,27 @@
 # Fly.io Deployment Reference
 
-## Quick Deploy Checklist
+## SQLite Deployment
+
+### Quick Checklist
+
+- [ ] `fly launch` (say NO to Postgres, NO to deploy)
+- [ ] `fly volumes create data --size 1 --region YOUR_REGION`
+- [ ] Uncomment `[mounts]` section in `fly.toml`
+- [ ] `fly scale count 1`
+- [ ] `fly deploy`
+
+### Important Limitations
+
+- SQLite on Fly.io requires exactly **1 machine** (no horizontal scaling)
+- Data is stored on a Fly volume -- volumes are region-specific
+- If the machine is destroyed, the volume persists (data is safe)
+- Backups: use `fly ssh console` to access the SQLite file, or `fly sftp get /app/data/myapp.db`
+
+---
+
+## PostgreSQL Deployment
+
+### Quick Checklist
 
 - [ ] `fly launch` (say NO to Postgres, NO to deploy)
 - [ ] Create Managed Postgres via dashboard
@@ -9,7 +30,7 @@
 - [ ] `fly secrets set DATABASE_URL="..."`
 - [ ] `fly deploy`
 
-## Key Differences: Managed Postgres vs Old Fly Postgres
+### Key Differences: Managed Postgres vs Old Fly Postgres
 
 Managed Postgres (MPG) clusters are **not** Fly apps. They won't appear in `fly apps list` or `fly postgres list`.
 
@@ -20,7 +41,7 @@ Managed Postgres (MPG) clusters are **not** Fly apps. They won't appear in `fly 
 | Proxy | `fly mpg connect <cluster-id> --port 15432` |
 | Set DB URL | `fly secrets set DATABASE_URL="..."` (manual) |
 
-## Connection String Format
+### Connection String Format
 
 ```
 postgres://postgres:PASSWORD@CLUSTER.pooler.fly.io:5432/fly-db?sslmode=require
@@ -29,6 +50,8 @@ postgres://postgres:PASSWORD@CLUSTER.pooler.fly.io:5432/fly-db?sslmode=require
 - Database name is always `fly-db` (not customizable)
 - Use the pooler hostname from dashboard Connect tab
 - `sslmode=require` is required
+
+---
 
 ## Troubleshooting
 
@@ -45,9 +68,12 @@ Use `fly mpg connect <cluster-id> --port 15432` instead.
 DATABASE_URL secret not set. Run `fly secrets set DATABASE_URL="..."`.
 
 ### Extensions not available (e.g., pgvector)
-Enable extensions in the Fly dashboard: Postgres → your cluster → Extensions tab.
+Enable extensions in the Fly dashboard: Postgres -> your cluster -> Extensions tab.
 
-## Syncing Local Database to Fly
+### SQLite data lost on redeploy
+You need a volume. Run `fly volumes create data --size 1` and uncomment `[mounts]` in `fly.toml`.
+
+## Syncing Local PostgreSQL to Fly
 
 ```bash
 # Terminal 1: Start proxy
@@ -58,7 +84,7 @@ pg_dump -U plc --clean --if-exists YOUR_LOCAL_DB > backup.sql
 psql "postgres://postgres:PASSWORD@localhost:15432/fly-db" < backup.sql
 ```
 
-## Full Deployment Walkthrough
+## Full PostgreSQL Deployment Walkthrough
 
 ### 1. Create App
 ```bash
@@ -70,7 +96,7 @@ fly launch
 
 ### 2. Create Managed Postgres
 1. Go to https://fly.io/dashboard
-2. Click **Postgres** → **Create**
+2. Click **Postgres** -> **Create**
 3. Choose name and region (same region as app)
 4. Note the **cluster ID** (e.g., `abc123xyz`)
 

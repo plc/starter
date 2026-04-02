@@ -2,9 +2,8 @@
 #
 # First-time setup:
 #   1. Run `fly launch` to create your app and update this file
-#   2. Run `fly postgres create --name myapp-db` to create a database
-#   3. Run `fly postgres attach myapp-db` to connect the database
-#   4. Run `fly deploy` to deploy
+#   2. Set DATABASE_URL if using PostgreSQL (see CLAUDE.md)
+#   3. Run `fly deploy` to deploy
 #
 # Subsequent deploys:
 #   fly deploy
@@ -17,9 +16,10 @@ primary_region = "sjc"
 # Build using the Dockerfile
 [build]
 
-# Environment variables (DATABASE_URL is set automatically by fly postgres attach)
+# Environment variables
 [env]
   PORT = "3000"
+  DB_TYPE = "sqlite"
 
 # HTTP service configuration
 [http_service]
@@ -29,6 +29,11 @@ primary_region = "sjc"
   auto_start_machines = true     # Start machine on incoming request
   min_machines_running = 0       # Allow all machines to stop when idle
   processes = ["app"]
+
+# Uncomment for SQLite persistence on Fly.io (single machine only):
+# [mounts]
+#   source = "data"
+#   destination = "/app/data"
 
 # VM resources (minimal for starter app)
 [[vm]]

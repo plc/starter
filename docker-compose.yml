@@ -1,41 +1,24 @@
-# Docker Compose configuration for local development
+# Docker Compose configuration for local development (SQLite mode)
 #
 # Architecture:
-#   host postgres (5432) <- init-db (migrations) <- app (node.js)
+#   app (node.js) -> ./data/myapp.db (SQLite)
 #
 # Usage:
 #   docker compose up --build     # Start everything
 #   docker compose down           # Stop everything
 #   docker compose logs -f app    # View app logs
 #
-# Prerequisites:
-#   PostgreSQL running on host machine (port 5432)
-#
 # Port: Determined by project name. Run ./scripts/get-port.sh to see your port.
 
 services:
-  # Database initialization - runs migrations then exits
-  init-db:
-    image: postgres:16-alpine
-    environment:
-      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
-      - DB_NAME=${DB_NAME:-myapp}
-    volumes:
-      - ./scripts/init-db.sh:/init-db.sh:ro
-    entrypoint: ["/init-db.sh"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
   # Node.js application
   app:
     build: .
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     environment:
-      - DATABASE_URL=postgres://plc:postgres@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DB_TYPE=sqlite
+      - SQLITE_PATH=/app/data/myapp.db
       - PORT=${PORT:-3000}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      init-db:
-        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data
