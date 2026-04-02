@@ -14,7 +14,9 @@ gh issue create --repo plc/starter --title "Brief description" --body "Details o
 
 ## Initializing a New Project
 
-When a user clones this repo to start a new project, you MUST follow these steps IN ORDER:
+When a user clones this repo to start a new project, you MUST follow these steps IN ORDER.
+
+**Project name:** If the user has already specified a project name, use it. If they haven't, come up with a short, descriptive name yourself based on what the project does (lowercase, hyphenated, e.g. `meal-planner`, `invoice-api`). Mention the name you chose so the user can override it, but don't block on confirmation -- just proceed.
 
 ### Step 0: Choose Database
 
@@ -61,6 +63,8 @@ git remote add origin https://github.com/USER/NEW_PROJECT.git
 Otherwise, remind the user to add a remote later.
 
 ### Step 2: Rename `myapp` to the project name
+
+Use the project name provided by the user, or the name you chose (see "Project name" note above).
 
 ```bash
 sed -i '' 's/myapp/PROJECT_NAME/g' package.json docker-compose.yml .env.example .dockerignore
