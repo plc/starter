@@ -1,30 +1,49 @@
 # Docker Compose configuration for local development (PostgreSQL mode)
 #
 # Architecture:
-#   host postgres (5432) <- init-db (migrations) <- app (node.js)
+#   postgres (container) <- init-db (migrations) <- app (node.js)
+#   All services run in Docker. Postgres data persists in a named volume.
 #
 # Usage:
-#   docker compose -f docker-compose.postgres.yml up --build     # Start everything
-#   docker compose -f docker-compose.postgres.yml down           # Stop everything
-#   docker compose -f docker-compose.postgres.yml logs -f app    # View app logs
+#   docker compose up --build     # Start everything
+#   docker compose down           # Stop everything
+#   docker compose logs -f app    # View app logs
 #
-# Prerequisites:
-#   PostgreSQL running on host machine (port 5432)
+# Connect from host (psql, etc.):
+#   psql postgres://postgres:postgres@localhost:5432/myapp
 #
 # Port: Determined by project name. Run ./scripts/get-port.sh to see your port.
 
 services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${PG_USER:-postgres}
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-myapp}
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres}"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
   # Database initialization - runs migrations then exits
   init-db:
     image: postgres:16-alpine
     environment:
-      - DATABASE_URL=postgres://${PG_USER:-plc}:${PG_PASSWORD:-postgres}@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DATABASE_URL=postgres://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-myapp}
       - DB_NAME=${DB_NAME:-myapp}
     volumes:
       - ./scripts/init-db.sh:/init-db.sh:ro
     entrypoint: ["/init-db.sh"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # Node.js application
   app:
@@ -34,10 +53,11 @@ services:
     environment:
       - APP_NAME=${APP_NAME:-myapp}
       - DB_TYPE=postgres
-      - DATABASE_URL=postgres://${PG_USER:-plc}:${PG_PASSWORD:-postgres}@host.docker.internal:5432/${DB_NAME:-myapp}
+      - DATABASE_URL=postgres://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-myapp}
       - PORT=${PORT:-3000}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       init-db:
         condition: service_completed_successfully
+
+volumes:
+  pgdata:
